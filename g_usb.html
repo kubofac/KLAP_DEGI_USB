@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+  <title>KLAP_DEGI_USB</title>
+
+<link rel="manifest" href="/manifest.json">
+
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+            .then(registration => {
+                console.log('Service Worker registered! Scope:', registration.scope);
+            })
+            .catch(err => {
+                console.log('Service Worker registration failed:', err);
+            });
+    });
+}
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>HRC_J-CURVE_HYBRID_V12</title>
+    <style>
+        :root { --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: var(--bg-dark); color: var(--hrc-white); font-family: 'Arial Black', sans-serif; overflow: hidden; }
+        .hrc-line { height: 4px; display: flex; width: 100%; position: fixed; top: 0; z-index: 100; }
+        .b { background: var(--hrc-blue); flex: 1; } .w { background: var(--hrc-white); flex: 1; } .r { background: var(--hrc-red); flex: 1; }
+        #dashboard { display: grid; grid-template-columns: 1fr 240px 140px; grid-template-rows: 1fr 55px; height: 100dvh; padding: 5px; gap: 10px; box-sizing: border-box; }
+        #tacho-layer { grid-column: 1 / 4; grid-row: 1 / 2; position: relative; }
+        #canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; }
+        #info-overlay { position: absolute; top: 60%; left: 42%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; pointer-events: none; z-index: 10; }
+        #rpm_digital { line-height: 1; margin-bottom: 40px; }
+        #rpm_val { font-size: 110px; font-weight: 900; }
+        #display1 { font-size: 8.5vw; font-weight: 900; line-height: 0.8; }
+        .right-panels { grid-column: 2 / 4; grid-row: 1 / 2; display: grid; grid-template-columns: 240px 140px; margin-top: 155px; height: calc(100% - 165px); z-index: 20; gap: 10px; }
+        #col-2 { border-left: 1px solid #444; overflow-y: auto; background: rgba(0,0,0,0.6); scrollbar-width: none; border-radius: 4px; }
+        .lap-row { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #222; font-family: 'monospace'; font-size: 20px; font-weight: bold; }
+        .best-lap { color: var(--hrc-red); background: rgba(228, 0, 43, 0.25); border-left: 6px solid var(--hrc-red); }
+        .data-box { background: rgba(20,20,20,0.8); padding: 12px 10px; border-top: 4px solid var(--hrc-blue); position: relative; display: flex; flex-direction: column; justify-content: space-between; height: 80px; }
+        .label { font-size: 10px; color: var(--hrc-red); font-weight: bold; margin-bottom: 2px; }
+        .val { font-size: 48px; font-weight: 900; line-height: 1; text-align: right; width: 100%; }
+        .unit { font-size: 11px; text-align: right; color: #aaa; margin-top: -2px; padding-right: 2px; }
+        footer { grid-column: 1 / 4; display: flex; gap: 4px; z-index: 100; }
+        button { flex: 1; background: #1a1a1a; color: #aaa; border: 1px solid #333; border-radius: 4px; font-size: 10px; cursor: pointer; font-weight: bold; }
+        button.active { background: var(--hrc-red); color: white; border-color: var(--hrc-red); }
+    </style>
+</head>
+<body>
+    <div class="hrc-line"><div class="b"></div><div class="w"></div><div class="r"></div></div>
+    <div id="dashboard">
+        <div id="tacho-layer">
+            <canvas id="canvas"></canvas>
+            <div id="info-overlay">
+                <div id="rpm_digital"><span id="rpm_val">0</span><span style="font-size:24px; margin-left:10px;">rpm</span></div>
+                <div id="display1">00:00.000</div>
+                <div id="display" style="font-size:2vw; color:#666;">TOTAL 00:00.000</div>
+            </div>
+        </div>
+        <div class="right-panels">
+            <div id="col-2"><div id="lap"></div></div>
+            <div id="col-3">
+                <div class="data-box">
+                    <div class="label">SPEED (USB-GPS)</div>
+                    <span class="val" id="speed_val">0</span>
+                    <span class="unit">km/h</span>
+                </div>
+                <div class="data-box">
+                    <div class="label">TEMP</div>
+                    <span class="val" id="temp_val">--</span>
+                    <span class="unit">℃</span>
+                </div>
+            </div>
+        </div>
+        <footer>
+            <button id="btConnect">BLE START</button>
+            <button id="usbGpsBtn">USB GPS START</button>
+            <button id="startBtn">TIMER START</button>
+            <button id="lapBtn">LAP/RESET</button>
+            <button id="configBtn" onclick="getSettings()">RELOAD SET</button>
+        </footer>
+    </div>
+
+<script>
+'use strict';
+const NMEA_VENDOR_ID = 0x1546, NMEA_PRODUCT_ID = 0x01A8, IN_ENDPOINT = 2, INTERFACE_NUMBER = 1;
+const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", PULSE_UUID = "f4deb353-a4cf-4ffb-badb-2a5f2e3bb630", TEMP_UUID = "ac98b174-608a-41f2-aa83-7e55432fafa9";
+const MAX_RPM = 14000, RED_ZONE = 12500;
+
+let currentRPM = 0, device = null, nmeaBuffer = '', lastPos = null, lastLapTime = 0;
+let LAP_LINE_P1 = { lat: 0, lon: 0 }, LAP_LINE_P2 = { lat: 0, lon: 0 };
+let gpsThresholdValue = 20, lapCoolDown = 15000, pulseCount = 1; // パルス数初期化
+let bleDevice, swState = 0, startTime = 0, lapStartTime = 0, lapRecords = [];
+const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+
+// --- index.html側の設定を読み込み ---
+function getSettings() {
+    const p1Lat = localStorage.getItem('startLineP1Lat'), p1Lon = localStorage.getItem('startLineP1Lon');
+    const p2Lat = localStorage.getItem('startLineP2Lat'), p2Lon = localStorage.getItem('startLineP2Lon');
+    const storedPulse = localStorage.getItem('pulseCount');
+
+    if (p1Lat && p2Lat) {
+        LAP_LINE_P1 = { lat: parseFloat(p1Lat), lon: parseFloat(p1Lon) };
+        LAP_LINE_P2 = { lat: parseFloat(p2Lat), lon: parseFloat(p2Lon) };
+        gpsThresholdValue = parseFloat(localStorage.getItem('gpsThreshold')) || 20;
+        lapCoolDown = parseFloat(localStorage.getItem('lapCoolDownTime')) || 15000;
+    }
+    // パルス設定の更新 (1未満にならないよう保護)
+    pulseCount = (storedPulse && parseInt(storedPulse) > 0) ? parseInt(storedPulse) : 1;
+    console.log("Pulse Setting Loaded:", pulseCount);
+}
+
+function renderLoop() { drawTacho(currentRPM); requestAnimationFrame(renderLoop); }
+
+function drawTacho(rpm) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const w = canvas.width, h = canvas.height, segments = 60, active = Math.floor((rpm/MAX_RPM)*segments);
+    const sX = 40, hY = 65, sY = h-35, rad = sY-hY, curveEnd = 34;
+    for (let i = 0; i < segments; i++) {
+        let x, y, ang, prog;
+        if (i <= curveEnd) {
+            prog = i / curveEnd; ang = Math.PI + (prog * Math.PI / 2);
+            x = sX + rad + Math.cos(ang) * rad; y = hY + rad + Math.sin(ang) * rad;
+        } else {
+            prog = (i - curveEnd) / (segments - curveEnd);
+            x = (sX + rad) + (prog * (w - (sX + rad) - 30)); y = hY; ang = -Math.PI / 2;
+        }
+        let curRpm = (i/segments)*MAX_RPM;
+        ctx.fillStyle = i < active ? (curRpm >= RED_ZONE ? "#E4002B" : (curRpm >= 8000 ? "#004098" : "#FFFFFF")) : "#222";
+        ctx.save(); ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2); ctx.fillRect(-8, -26, 16, 52); ctx.restore();
+        if (Math.round(curRpm/1000) % 2 === 0) {
+            let targetIdx = Math.floor(((Math.round(curRpm/1000)*1000)/MAX_RPM)*segments);
+            if (i === targetIdx) {
+                ctx.fillStyle = "#FFF"; ctx.font = "bold 24px Arial"; ctx.textAlign = "center";
+                let lx = x, ly = y;
+                if (i <= curveEnd) { lx += 65 * Math.cos(ang + Math.PI); ly += 65 * Math.sin(ang + Math.PI); }
+                else { ly += 75; }
+                ctx.fillText(Math.round(curRpm/1000), lx, ly);
+            }
+        }
+    }
+    document.getElementById('rpm_val').textContent = Math.floor(rpm);
+}
+
+// GPS / NMEA 解析 (省略なし)
+function dmmToDec(dmm, dir) {
+    if (!dmm) return NaN;
+    const dot = dmm.indexOf('.');
+    const d = parseInt(dmm.substring(0, dot-2)), m = parseFloat(dmm.substring(dot-2));
+    let dec = d + (m/60); return (dir === 'S' || dir === 'W') ? -dec : dec;
+}
+
+function parseNMEA(line) {
+    const p = line.split(',');
+    if (line.includes('RMC') && p[2] === 'A') { document.getElementById('speed_val').textContent = Math.round(parseFloat(p[7]) * 1.852); }
+    if (line.includes('GGA') && p[6] !== '0') {
+        const currentPos = { lat: dmmToDec(p[2], p[3]), lon: dmmToDec(p[4], p[5]), time: Date.now() };
+        if (lastPos && swState === 1 && LAP_LINE_P1.lat !== 0) {
+            const dist = Math.sqrt(Math.pow(currentPos.lat - LAP_LINE_P1.lat, 2) + Math.pow(currentPos.lon - LAP_LINE_P1.lon, 2));
+            if (dist * 111320 <= gpsThresholdValue) {
+                const cp1 = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (lastPos.lat - LAP_LINE_P1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (lastPos.lon - LAP_LINE_P1.lon);
+                const cp2 = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (currentPos.lat - LAP_LINE_P1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (currentPos.lon - LAP_LINE_P1.lon);
+                if ((cp1 > 0 && cp2 < 0) || (cp1 < 0 && cp2 > 0)) {
+                    const frac = Math.abs(cp1) / (Math.abs(cp1) + Math.abs(cp2));
+                    const exactTime = lastPos.time + (currentPos.time - lastPos.time) * frac;
+                    if (exactTime - lastLapTime > lapCoolDown) { processLap(exactTime); }
+                }
+            }
+        }
+        lastPos = currentPos;
+    }
+}
+
+async function startUsbGps() {
+    try {
+        device = await navigator.usb.requestDevice({ filters: [{ vendorId: NMEA_VENDOR_ID, productId: NMEA_PRODUCT_ID }] });
+        await device.open(); if (device.configuration === null) await device.selectConfiguration(1);
+        await device.claimInterface(INTERFACE_NUMBER);
+        document.getElementById('usbGpsBtn').textContent = "USB CONNECTED";
+        document.getElementById('usbGpsBtn').classList.add('active');
+        while (device) {
+            const result = await device.transferIn(IN_ENDPOINT, 512);
+            if (result.status === 'ok') {
+                const lines = (nmeaBuffer + new TextDecoder().decode(result.data)).split(/\r?\n/);
+                nmeaBuffer = lines.pop(); lines.forEach(parseNMEA);
+            }
+        }
+    } catch (e) { console.error(e); }
+}
+
+function processLap(exactTime) {
+    const lapTime = exactTime - (lapStartTime || startTime);
+    lapRecords.unshift(lapTime); lapStartTime = exactTime; lastLapTime = exactTime;
+    updateLapList(); document.getElementById('display1').textContent = timeFormat(lapTime);
+}
+
+// --- BLE 接続 (パルス数計算に対応) ---
+async function ble() {
+    try {
+        bleDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
+        const server = await bleDevice.gatt.connect(), service = await server.getPrimaryService(SERVICE_UUID);
+        const p = await service.getCharacteristic(PULSE_UUID), t = await service.getCharacteristic(TEMP_UUID);
+        
+        await p.startNotifications(); 
+        p.oncharacteristicvaluechanged = (e) => { 
+            // 修正: 受信パルスを pulseCount で割ってRPMを算出
+            let rawHz = e.target.value.getUint16(0, true);
+            currentRPM = (rawHz * 60) / pulseCount; 
+        };
+        
+        await t.startNotifications(); 
+        t.oncharacteristicvaluechanged = (e) => { document.getElementById('temp_val').textContent = e.target.value.getUint8(0); };
+        document.getElementById('btConnect').classList.add('active');
+    } catch (e) { console.error(e); }
+}
+
+function timeFormat(ms) {
+    let m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000), mss = Math.floor(ms%1000);
+    return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}.${mss.toString().padStart(3,'0')}`;
+}
+
+function updateLapList() {
+    const d = document.getElementById('lap'); d.innerHTML = "";
+    if (!lapRecords.length) return;
+    const best = Math.min(...lapRecords);
+    lapRecords.forEach((t, i) => {
+        const r = document.createElement('div');
+        r.className = `lap-row ${t === best ? 'best-lap' : ''}`;
+        r.innerHTML = `<span>L${lapRecords.length-i}</span><span>${timeFormat(t)}</span>`;
+        d.appendChild(r);
+    });
+}
+
+function tick() {
+    if (swState !== 1) return;
+    const now = Date.now();
+    document.getElementById('display').textContent = "TOTAL " + timeFormat(now - startTime);
+    document.getElementById('display1').textContent = timeFormat(now - lapStartTime);
+    requestAnimationFrame(tick);
+}
+
+document.getElementById('usbGpsBtn').onclick = startUsbGps;
+document.getElementById('btConnect').onclick = ble;
+document.getElementById('startBtn').onclick = () => { if(swState!==1){ swState=1; startTime=Date.now(); lapStartTime=startTime; tick(); } else { swState=2; } };
+document.getElementById('lapBtn').onclick = () => { if(swState===1){ processLap(Date.now()); } else { swState=0; lapRecords=[]; updateLapList(); document.getElementById('display1').textContent="00:00.000"; } };
+
+window.onresize = () => { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; };
+window.onload = () => { getSettings(); window.dispatchEvent(new Event('resize')); renderLoop(); };
+</script>
+</body>
+</html>
