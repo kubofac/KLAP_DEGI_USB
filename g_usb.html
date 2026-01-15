@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="ja">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="KLAP_DEGI_USB">
 
-<meta name="theme-color" content="#000000">
-  <title>KLAP_DEGI_USB</title>
+
+
+
+
+
+
+
+
 
 <link rel="manifest" href="/manifest.json">
 
@@ -39,7 +42,20 @@ if ('serviceWorker' in navigator) {
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>HRC_J-CURVE_HYBRID_V12</title>
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="KLAP_DEGI_USB">
+
+<meta name="theme-color" content="#000000">
+
+
+
+
+
+
+
+    <title>KLAP_DEGI_USB</title>
     <style>
         :root { --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; }
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: var(--bg-dark); color: var(--hrc-white); font-family: 'Arial Black', sans-serif; overflow: hidden; }
@@ -267,5 +283,4 @@ window.onresize = () => { canvas.width = canvas.parentElement.clientWidth; canva
 window.onload = () => { getSettings(); window.dispatchEvent(new Event('resize')); renderLoop(); };
 </script>
 </body>
-
 </html>
