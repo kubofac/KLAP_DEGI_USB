@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="ja">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="KLAP_DEGI_USB">
 
+<meta name="theme-color" content="#000000">
   <title>KLAP_DEGI_USB</title>
 
 <link rel="manifest" href="/manifest.json">
@@ -263,4 +267,5 @@ window.onresize = () => { canvas.width = canvas.parentElement.clientWidth; canva
 window.onload = () => { getSettings(); window.dispatchEvent(new Event('resize')); renderLoop(); };
 </script>
 </body>
+
 </html>
