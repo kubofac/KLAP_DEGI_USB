@@ -1,4 +1,4 @@
-const CACHE_NAME = 'DorroborBK_ver2';
+const CACHE_NAME = 'KLAP DEGI USB';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -8,7 +8,6 @@ const urlsToCache = [
   '/192.png',
   '/512.png',
   // 画像やJavaScriptファイルなど、アプリを構成するすべての静的ファイルをここに追加
-
   '/circuit_data.js', // 設定ツールで使われるファイル
   // その他のCSSやJSファイルなど
 ];
@@ -55,3 +54,5 @@ self.addEventListener('activate', (event) => {
   );
 
 });
+
+
