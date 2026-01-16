@@ -631,10 +631,11 @@ if ('serviceWorker' in navigator) {
             }
         }
 
-        let button2 = document.getElementById('mybtn2');
-        button2.addEventListener('click', () => {
-            open('g_usb.html');
-        });
+       let button2 = document.getElementById('mybtn2');
+button2.addEventListener('click', () => {
+    // open('g_usb.html'); ← これを削除して下に変更
+    window.location.href = 'g_usb.html'; 
+});
 
         // Function to reset all stored data and update UI
         function resetStorageAndDisplay() {
@@ -698,4 +699,5 @@ if ('serviceWorker' in navigator) {
     </script>
 </body>
 </html>
+
 
