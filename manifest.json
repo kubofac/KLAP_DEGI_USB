@@ -4,9 +4,11 @@
   "description": "BLEとGPSに対応したラップタイマーアプリです。",
   "start_url": "/index.html",
   "display": "fullscreen",
-  "orientation": "landscape",
+  "orientation": "any",
   "background_color": "#ffffff",
   "theme_color": "#2196F3",
+"scope": "/",
+  
   "icons": [
     {
       "src": "/192.png",
@@ -21,3 +23,4 @@
   ]
 
 }
+
