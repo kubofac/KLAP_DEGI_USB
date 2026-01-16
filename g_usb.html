@@ -89,6 +89,22 @@ if ('serviceWorker' in navigator) {
     </div>
 
 <script>
+
+window.onload = () => {
+    // 画面の向きを横（landscape）にロックする
+    if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch((err) => {
+            console.log("方向ロックに失敗しました（無視してOK）:", err);
+        });
+    }
+    
+    getSettings(); 
+    window.dispatchEvent(new Event('resize')); 
+    renderLoop(); 
+};
+
+
+ 
 'use strict';
 const NMEA_VENDOR_ID = 0x1546, NMEA_PRODUCT_ID = 0x01A8, IN_ENDPOINT = 2, INTERFACE_NUMBER = 1;
 const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", PULSE_UUID = "f4deb353-a4cf-4ffb-badb-2a5f2e3bb630", TEMP_UUID = "ac98b174-608a-41f2-aa83-7e55432fafa9";
@@ -257,5 +273,6 @@ window.onload = () => { getSettings(); window.dispatchEvent(new Event('resize'))
 </body>
 
 </html>
+
 
 
