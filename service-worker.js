@@ -8,8 +8,7 @@ const urlsToCache = [
   '/192.png',
   '/512.png',
   // 画像やJavaScriptファイルなど、アプリを構成するすべての静的ファイルをここに追加
-  '/22.gif', // test3_4_ana_555.htmlで使われる画像
-  '/33.svg', // test3_4_ana_555.htmlで使われる画像
+
   '/circuit_data.js', // 設定ツールで使われるファイル
   // その他のCSSやJSファイルなど
 ];
@@ -54,4 +53,5 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+
 });
