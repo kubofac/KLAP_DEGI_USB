@@ -28,93 +28,60 @@ if ('serviceWorker' in navigator) {
 
 
     <title>KLAP_DEGI_USB</title>
-    <style>
-    :root { 
-        --hrc-red: #E4002B; 
-        --hrc-blue: #004098; 
-        --hrc-white: #ffffff; 
-        --bg-dark: #000000; 
-    }
-
-    body, html { 
-        margin: 0; padding: 0; width: 100%; height: 100%; 
-        background-color: var(--bg-dark); color: var(--hrc-white); 
-        font-family: 'Arial Black', sans-serif; overflow: hidden; 
-    }
-
-    /* 上部のライン */
+  <style>
+    :root { --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; }
+    
+    body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: var(--bg-dark); color: var(--hrc-white); font-family: 'Arial Black', sans-serif; overflow: hidden; }
     .hrc-line { height: 4px; display: flex; width: 100%; position: fixed; top: 0; z-index: 100; }
     .b { background: var(--hrc-blue); flex: 1; } .w { background: var(--hrc-white); flex: 1; } .r { background: var(--hrc-red); flex: 1; }
 
-    /* メインレイアウト：右側のパネル幅を少し詰め、ボタンの高さを確保 */
+    /* メインレイアウト */
     #dashboard { 
         display: grid; 
-        grid-template-columns: 1fr 180px 120px; /* パネル幅を最適化 */
-        grid-template-rows: 1fr 50px;           /* ボタンエリアの高さを50pxに固定 */
-        height: 100vh; 
-        padding: 10px; 
+        /* 左側のメーターを大きく(1.2fr)、右パネルを固定 */
+        grid-template-columns: 1.2fr 200px 140px; 
+        /* メインエリアとボタンエリア(45px)に分割 */
+        grid-template-rows: 1fr 45px; 
+        height: 100dvh; 
+        padding: 5px; 
         gap: 10px; 
         box-sizing: border-box; 
     }
 
-    /* メーターエリア */
-    #tacho-layer { grid-column: 1 / 2; grid-row: 1 / 2; position: relative; }
+    /* タコメーターエリア：左端から配置 */
+    #tacho-layer { grid-column: 1 / 2; grid-row: 1 / 2; position: relative; width: 100%; height: 100%; }
     #canvas { width: 100%; height: 100%; display: block; }
 
-    /* 中央のデジタル表示：重なり防止のためvh（高さ基準）でサイズ指定 */
+    /* デジタル表示の調整：メーターに被らないようサイズダウン */
     #info-overlay { 
-        position: absolute; top: 62%; left: 50%; 
+        position: absolute; top: 60%; left: 45%; 
         transform: translate(-50%, -50%); 
         display: flex; flex-direction: column; align-items: center; 
         pointer-events: none; z-index: 10; 
     }
-    #rpm_digital { line-height: 1; margin-bottom: 5px; white-space: nowrap; }
-    #rpm_val { font-size: 15vh; font-weight: 900; } /* 画面の高さに対して15%のサイズ */
-    #display1 { font-size: 8vh; font-weight: 900; line-height: 1; }
-    #display { font-size: 2.5vh; color: #888; margin-top: 5px; }
+    #rpm_digital { line-height: 1; margin-bottom: 10px; }
+    #rpm_val { font-size: 80px; font-weight: 900; } /* はみ出し防止のためサイズ調整 */
+    #display1 { font-size: 50px; font-weight: 900; line-height: 0.8; white-space: nowrap; }
 
-    /* 右側パネルエリア */
+    /* 右側パネル：右端に寄せる */
     .right-panels { 
         grid-column: 2 / 4; grid-row: 1 / 2; 
-        display: grid; grid-template-columns: 180px 120px; 
-        gap: 10px; height: 100%; 
+        display: grid; grid-template-columns: 200px 140px; 
+        gap: 10px; height: 100%; align-items: end; /* 下揃えにしてボタンとの隙間を調整 */
     }
 
-    /* ラップ履歴：はみ出さないようにスクロール可能に */
-    #col-2 { 
-        background: rgba(20,20,20,0.8); border-radius: 4px; 
-        overflow-y: auto; scrollbar-width: none; border: 1px solid #333; 
-    }
-    .lap-row { 
-        display: flex; justify-content: space-between; 
-        padding: 8px; border-bottom: 1px solid #222; 
-        font-family: 'monospace'; font-size: 18px; 
-    }
-    .best-lap { color: var(--hrc-red); background: rgba(228,0,43,0.2); border-left: 4px solid var(--hrc-red); }
+    #col-2 { border-left: 1px solid #444; overflow-y: auto; background: rgba(0,0,0,0.6); scrollbar-width: none; border-radius: 4px; height: 100%; }
+    .lap-row { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #222; font-family: 'monospace'; font-size: 18px; font-weight: bold; }
 
-    /* データボックス：高さを％指定して縦に並べる */
-    #col-3 { display: flex; flex-direction: column; gap: 10px; }
-    .data-box { 
-        background: rgba(20,20,20,0.8); padding: 8px; 
-        border-top: 4px solid var(--hrc-blue); 
-        flex: 1; display: flex; flex-direction: column; justify-content: center; 
-    }
-    .label { font-size: 10px; color: var(--hrc-red); font-weight: bold; margin-bottom: 2px; }
-    .val { font-size: 40px; font-weight: 900; text-align: right; line-height: 1; width: 100%; }
+    .data-box { background: rgba(20,20,20,0.8); padding: 8px; border-top: 4px solid var(--hrc-blue); display: flex; flex-direction: column; justify-content: center; height: 85px; }
+    .label { font-size: 10px; color: var(--hrc-red); font-weight: bold; }
+    .val { font-size: 40px; font-weight: 900; line-height: 1; text-align: right; }
     .unit { font-size: 11px; text-align: right; color: #aaa; }
 
-    /* ボタン：絶対に画面内に残るよう設定 */
-    footer { 
-        grid-column: 1 / 4; grid-row: 2 / 3; 
-        display: flex; gap: 6px; 
-    }
-    button { 
-        flex: 1; background: #1a1a1a; color: #eee; 
-        border: 1px solid #444; border-radius: 4px; 
-        font-size: 14px; cursor: pointer; font-weight: bold; 
-        height: 100%;
-    }
-    button.active { background: var(--hrc-red); border-color: var(--hrc-red); color: white; }
+    /* ボタンエリア：最下部に固定 */
+    footer { grid-column: 1 / 4; grid-row: 2 / 3; display: flex; gap: 4px; z-index: 100; height: 100%; }
+    button { flex: 1; background: #1a1a1a; color: #aaa; border: 1px solid #333; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold; }
+    button.active { background: var(--hrc-red); color: white; border-color: var(--hrc-red); }
 </style>
 </head>
 <body>
@@ -323,6 +290,7 @@ window.onload = () => { getSettings(); window.dispatchEvent(new Event('resize'))
 </body>
 
 </html>
+
 
 
 
