@@ -294,21 +294,62 @@ async function ble() {
 function drawTacho(rpm) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const w = canvas.width, h = canvas.height;
-    const segments = 60, active = Math.floor((rpm/14000)*segments);
-    const sX = 40, hY = 65, sY = h-35, rad = sY-hY, curveEnd = 34;
+    
+    // 全体の分割数と現在の到達位置
+    const segments = 60; 
+    const active = Math.floor((rpm / 14000) * segments);
+    
+    // レイアウト定数
+    const sX = 50;        // 左端の余白
+    const hY = 70;        // 上部の高さ
+    const sY = h - 40;    // 下部の高さ
+    const rad = sY - hY;  // カーブの半径
+    const curveEnd = 25;  // カーブが終わるセグメント数（左側の曲がり角）
+
     for (let i = 0; i < segments; i++) {
         let x, y, ang, prog;
+        
         if (i <= curveEnd) {
-            prog = i / curveEnd; ang = Math.PI + (prog * Math.PI / 2);
-            x = sX + rad + Math.cos(ang) * rad; y = hY + rad + Math.sin(ang) * rad;
+            // --- 左側のカーブ部分 ---
+            prog = i / curveEnd;
+            // Math.PI (9時方向) から 1.5 * Math.PI (12時方向) へ向かう
+            ang = Math.PI + (prog * (Math.PI / 2));
+            x = sX + rad + Math.cos(ang) * rad;
+            y = hY + rad + Math.sin(ang) * rad;
         } else {
+            // --- 上部の直線部分 ---
             prog = (i - curveEnd) / (segments - curveEnd);
-            x = (sX + rad) + (prog * (w - 30 - (sX + rad))); y = hY; ang = -Math.PI / 2;
+            x = (sX + rad) + (prog * (w - 50 - (sX + rad)));
+            y = hY;
+            ang = 1.5 * Math.PI; // 真上を向く
         }
-        let curRpm = (i/segments)*14000;
-        ctx.fillStyle = i < active ? (curRpm >= 12500 ? "#E4002B" : (curRpm >= 8000 ? "#004098" : "#FFFFFF")) : "#222";
-        ctx.save(); ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2); ctx.fillRect(-8, -26, 16, 52); ctx.restore();
+
+        // 回転数に応じた色決定
+        let curRpm = (i / segments) * 14000;
+        if (i < active) {
+            // 到達しているバーの色
+            if (curRpm >= 12500) {
+                ctx.fillStyle = "#E4002B"; // レッドゾーン（赤）
+            } else if (curRpm >= 8000) {
+                ctx.fillStyle = "#004098"; // パワーバンド（青）
+            } else {
+                ctx.fillStyle = "#FFFFFF"; // 低回転（白）
+            }
+        } else {
+            // 未到達のバー（目盛りとして表示）
+            ctx.fillStyle = "#222"; 
+        }
+
+        // バーの描画
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(ang + Math.PI / 2);
+        // 四角形のサイズ [幅, 高さ]
+        ctx.fillRect(-6, -24, 12, 48); 
+        ctx.restore();
     }
+    
+    // デジタル表示の更新
     document.getElementById('rpm_val').textContent = Math.floor(rpm);
 }
 
@@ -351,6 +392,7 @@ window.onload = () => {
 </script>
 </body>
 </html>
+
 
 
 
