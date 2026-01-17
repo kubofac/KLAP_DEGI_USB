@@ -4,74 +4,113 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>HRC Style Dashboard</title>
-    <style>
-        :root { 
-            --hrc-red: #E4002B; 
-            --hrc-blue: #004098; 
-            --hrc-white: #ffffff; 
-            --bg-dark: #000000; 
-        }
+   <style>
+    :root { 
+        --hrc-red: #E4002B; 
+        --hrc-blue: #004098; 
+        --hrc-white: #ffffff; 
+        --bg-dark: #000000; 
+    }
 
-        body, html { 
-            margin: 0; padding: 0; width: 100%; height: 100%; 
-            background-color: var(--bg-dark); color: var(--hrc-white); 
-            font-family: 'Arial Black', sans-serif; overflow: hidden; 
-        }
+    body, html { 
+        margin: 0; padding: 0; width: 100%; height: 100%; 
+        background-color: var(--bg-dark); color: var(--hrc-white); 
+        font-family: 'Arial Black', sans-serif; overflow: hidden; 
+    }
 
-        #dashboard { 
-            position: relative;
-            display: flex; flex-direction: column; 
-            height: 100vh; height: 100dvh; width: 100vw; 
-        }
+    #dashboard { 
+        position: relative;
+        display: flex; flex-direction: column; 
+        height: 100vh; height: 100dvh; width: 100vw; 
+    }
 
-        /* キャンバスを完全に独立させ、画面全体をカバー */
-        #canvas { 
-            position: absolute; 
-            top: 0; left: 0; 
-            width: 100% !important; 
-            height: calc(100% - 50px) !important; /* Footer分を引く */
-            z-index: 1; 
-        }
+    /* キャンバスを背面に全面配置 */
+    #canvas { 
+        position: absolute; 
+        top: 0; left: 0; 
+        width: 100% !important; 
+        height: calc(100% - 50px) !important; 
+        z-index: 1; 
+    }
 
-        .top-section { 
-            flex: 1; position: relative; 
-            width: 100%; z-index: 10;
-            pointer-events: none; /* 下のCanvas操作を邪魔しない */
-        }
+    .top-section { 
+        flex: 1; position: relative; 
+        width: 100%; z-index: 10;
+        pointer-events: none; 
+    }
 
-        /* 中央の数値情報 */
-        #info-overlay { 
-            position: absolute; top: 65%; right: 280px; 
-            transform: translateY(-50%); display: flex; 
-            flex-direction: column; align-items: flex-end; 
-            z-index: 15; 
-        }
-        #rpm_val { font-size: 18vh; font-weight: 900; line-height: 0.75; text-shadow: 0 0 15px #000; }
-        #display1 { font-size: 14vh; font-weight: 900; line-height: 1.0; margin-top: 10px; text-shadow: 0 0 15px #000; }
-        #display { font-size: 4vh; color: #bbb; font-weight: bold; text-shadow: 0 0 10px #000; }
+    /* 中央のメイン数値 */
+    #info-overlay { 
+        position: absolute; top: 68%; right: 260px; 
+        transform: translateY(-50%); display: flex; 
+        flex-direction: column; align-items: flex-end; 
+        z-index: 15; 
+    }
+    #rpm_val { font-size: 18vh; font-weight: 900; line-height: 0.7; text-shadow: 0 0 15px #000; }
+    #display1 { font-size: 14vh; font-weight: 900; line-height: 1.0; margin-top: 10px; text-shadow: 0 0 15px #000; }
+    #display { font-size: 4vh; color: #bbb; font-weight: bold; text-shadow: 0 0 10px #000; }
 
-        /* 右側パネル：位置を調整し背景を付けて視認性を確保 */
-        .right-panels { 
-            position: absolute; right: 15px; top: 50%; 
-            transform: translateY(-50%); width: 200px; 
-            display: flex; flex-direction: column; gap: 40px; 
-            z-index: 20; pointer-events: auto;
-            background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px;
-        }
+    /* 右側パネル：高さを制限してスクロール可能にする */
+    .right-panels { 
+        position: absolute; 
+        right: 10px; 
+        top: 15px; 
+        bottom: 15px; /* 下端まで使わない（Footerの手前で止める） */
+        width: 190px; 
+        display: flex; 
+        flex-direction: column; 
+        z-index: 20; 
+        pointer-events: auto; /* スクロール操作を有効化 */
+        background: rgba(0,0,0,0.6); /* 背後のタコメーターを見せつつ文字を読みやすく */
+        padding: 10px; 
+        border-radius: 8px;
+        border: 1px solid #333;
+        box-sizing: border-box;
+    }
 
-        .data-box { display: flex; flex-direction: column; align-items: flex-end; }
-        .label { font-size: 14px; color: var(--hrc-red); font-weight: bold; margin-bottom: 5px; }
-        .val { font-size: 48px; font-weight: 900; line-height: 1; }
+    /* SPEED/TEMPを上部に固定 */
+    .data-box { 
+        display: flex; 
+        flex-direction: column; 
+        align-items: flex-end; 
+        margin-bottom: 25px; 
+        flex-shrink: 0; /* 潰れないように固定 */
+    }
+    .label { font-size: 14px; color: var(--hrc-red); font-weight: bold; margin-bottom: 2px; }
+    .val { font-size: 46px; font-weight: 900; line-height: 1; }
 
-        footer { height: 50px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: relative; }
-        button { 
-            flex: 1; height: 100%; background-color: #1a1a1a; color: #fff; 
-            border: 1px solid #444; border-radius: 4px; 
-            font-size: 11px; font-weight: bold; cursor: pointer;
-            transition: all 0.2s;
-        }
-        button.active { background-color: var(--hrc-red) !important; border-color: var(--hrc-red); color: #fff !important; }
-    </style>
+    /* ラップ履歴：ここを可変にしてスクロールさせる */
+    #col-2 { 
+        flex-grow: 1; /* 残りの高さをすべて使う */
+        overflow-y: auto; /* 溢れたらスクロール */
+        margin-top: 10px;
+        border-top: 1px solid #444;
+        padding-top: 10px;
+        scrollbar-width: thin; /* Firefox用 */
+    }
+    /* Chrome/Safari用のスクロールバー非表示設定（お好みで） */
+    #col-2::-webkit-scrollbar { width: 4px; }
+    #col-2::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+
+    .lap-row { 
+        display: flex; 
+        justify-content: space-between; 
+        padding: 6px 0; 
+        border-bottom: 1px solid rgba(255,255,255,0.1); 
+        font-family: 'monospace'; 
+        font-size: 18px; 
+        font-weight: bold; 
+    }
+    .best-lap { color: var(--hrc-red); }
+
+    footer { height: 50px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: relative; }
+    button { 
+        flex: 1; height: 100%; background-color: #1a1a1a; color: #fff; 
+        border: 1px solid #444; border-radius: 4px; 
+        font-size: 11px; font-weight: bold; cursor: pointer;
+    }
+    button.active { background-color: var(--hrc-red) !important; color: #fff !important; }
+</style>
 </head>
 <body>
 
@@ -214,8 +253,8 @@ function drawTacho(rpm) {
     const w = canvas.width, h = canvas.height;
     const segments = 60, active = Math.floor((rpm / 14000) * segments);
     
-    // 描画領域を画面下端(h-20)から上端(60)まで最大限使う
-    const sX = 80, hY = 60, bY = h - 20, rad = bY - hY, curveEnd = 25;
+    // sXを少し詰め、w-220にすることでバーを右端まで延長
+    const sX = 65, hY = 60, bY = h - 25, rad = bY - hY, curveEnd = 25;
 
     for (let i = 0; i <= segments; i++) {
         let x, y, ang, prog;
@@ -224,22 +263,26 @@ function drawTacho(rpm) {
             x = sX + rad + Math.cos(ang) * rad; y = hY + rad + Math.sin(ang) * rad;
         } else {
             prog = (i - curveEnd) / (segments - curveEnd);
-            x = (sX + rad) + (prog * (w - 320 - (sX + rad))); y = hY; ang = 1.5 * Math.PI;
+            // ★ 右端の制限を 220 まで広げました
+            x = (sX + rad) + (prog * (w - 220 - (sX + rad))); 
+            y = hY; ang = 1.5 * Math.PI;
         }
 
+        // 数値表示 (0, 2, 4... 14)
         if (i % 8 === 0 || i === segments) {
             const rpmNum = Math.round((i / segments) * 14);
-            const tx = x + Math.cos(ang) * 45, ty = y + Math.sin(ang) * 45;
+            const tx = x + Math.cos(ang) * 42, ty = y + Math.sin(ang) * 42;
             ctx.save(); ctx.fillStyle = i < active ? "#fff" : "#444";
-            ctx.font = "italic bold 24px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            ctx.font = "italic bold 22px Arial"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
             ctx.fillText(rpmNum, tx, ty); ctx.restore();
         }
 
+        // バー描画
         if (i < segments) {
             let curRpm = (i / segments) * 14000;
             ctx.fillStyle = i < active ? (curRpm >= 12500 ? "#E4002B" : (curRpm >= 8000 ? "#004098" : "#FFFFFF")) : "#222";
             ctx.save(); ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2);
-            ctx.fillRect(-6, -26, 12, 52); ctx.restore();
+            ctx.fillRect(-5, -24, 10, 48); ctx.restore();
         }
     }
 }
@@ -290,3 +333,4 @@ window.onload = () => {
 </script>
 </body>
 </html>
+
