@@ -4,54 +4,84 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>KLAP_DEGI_USB</title>
-    <style>
-        :root { 
-            --hrc-red: #E4002B; 
-            --hrc-blue: #004098; 
-            --hrc-white: #ffffff; 
-            --bg-dark: #000000; 
-        }
+   <style>
+    :root { 
+        --hrc-red: #E4002B; 
+        --hrc-blue: #004098; 
+        --hrc-white: #ffffff; 
+        --bg-dark: #000000; 
+    }
 
-        body, html { 
-            margin: 0; padding: 0; width: 100%; height: 100%; 
-            background-color: var(--bg-dark); color: var(--hrc-white); 
-            font-family: 'Arial Black', sans-serif; overflow: hidden; 
-        }
+    body, html { 
+        margin: 0; padding: 0; width: 100%; height: 100%; 
+        background-color: var(--bg-dark); color: var(--hrc-white); 
+        font-family: 'Arial Black', sans-serif; overflow: hidden; 
+    }
 
-        #dashboard { display: flex; flex-direction: column; height: 100dvh; width: 100vw; padding-top: 4px; box-sizing: border-box; }
-        .top-section { flex: 1; position: relative; overflow: hidden; }
-        #tacho-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-        #canvas { width: 100%; height: 100%; display: block; }
+    #dashboard { display: flex; flex-direction: column; height: 100dvh; width: 100vw; padding-top: 4px; box-sizing: border-box; }
+    .top-section { flex: 1; position: relative; overflow: hidden; }
+    #canvas { width: 100%; height: 100%; display: block; }
 
-        #info-overlay { 
-            position: absolute; top: 68%; right: 290px; 
-            transform: translateY(-50%); display: flex; 
-            flex-direction: column; align-items: flex-end; 
-            pointer-events: none; z-index: 10; 
-        }
-        #rpm_val { font-size: 20vh; font-weight: 900; line-height: 0.75; text-shadow: 0 0 15px #000; }
-        #display1 { font-size: 15vh; font-weight: 900; line-height: 1.0; margin-top: 15px; text-shadow: 0 0 15px #000; }
-        #display { font-size: 4.5vh; color: #bbb; font-weight: bold; margin-top: 5px; text-shadow: 0 0 10px #000; }
+    #info-overlay { 
+        position: absolute; top: 68%; right: 290px; 
+        transform: translateY(-50%); display: flex; 
+        flex-direction: column; align-items: flex-end; 
+        pointer-events: none; z-index: 10; 
+    }
+    #rpm_val { font-size: 20vh; font-weight: 900; line-height: 0.75; text-shadow: 0 0 15px #000; }
+    #display1 { font-size: 15vh; font-weight: 900; line-height: 1.0; margin-top: 15px; text-shadow: 0 0 15px #000; }
+    #display { font-size: 4.5vh; color: #bbb; font-weight: bold; margin-top: 5px; text-shadow: 0 0 10px #000; }
 
-        .right-panels { position: absolute; right: 15px; top: 120px; width: 250px; height: calc(100% - 130px); display: grid; grid-template-columns: 160px 80px; gap: 10px; z-index: 20; }
-        #col-2 { overflow-y: auto; height: 100%; scrollbar-width: none; }
-        .lap-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-family: 'monospace'; font-size: 20px; font-weight: bold; }
-        .best-lap { color: var(--hrc-red); }
+    /* 右側パネル：SPEED/TEMPの位置と間隔を調整 */
+    .right-panels { 
+        position: absolute; 
+        right: 15px; 
+        top: 130px; 
+        width: 250px; 
+        height: calc(100% - 140px); 
+        display: grid; 
+        grid-template-columns: 160px 80px; 
+        gap: 15px; 
+        z-index: 20; 
+    }
+    #col-2 { overflow-y: auto; height: 100%; scrollbar-width: none; }
+    .lap-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-family: 'monospace'; font-size: 20px; font-weight: bold; }
+    .best-lap { color: var(--hrc-red); }
 
-        .data-box { display: flex; flex-direction: column; align-items: flex-end; margin-bottom: 20px; }
-        .label { font-size: 11px; color: var(--hrc-red); font-weight: bold; margin-bottom: -5px; }
-        .val { font-size: 36px; font-weight: 900; line-height: 1; }
+    /* データボックスの縦の間隔を広げて重なりを解消 */
+    .data-box { 
+        display: flex; 
+        flex-direction: column; 
+        align-items: flex-end; 
+        margin-bottom: 40px; 
+    }
+    
+    /* ラベルを少し下に下げて数値とのバランスを調整 */
+    .label { 
+        font-size: 12px; 
+        color: var(--hrc-red); 
+        font-weight: bold; 
+        margin-bottom: 4px; 
+    }
+    
+    /* 数値を大きく、視認性をアップ */
+    .val { 
+        font-size: 44px; 
+        font-weight: 900; 
+        line-height: 1.1; 
+    }
 
-        footer { height: 45px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; }
+    footer { height: 45px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; }
 
-        button { 
-            flex: 1; height: 100%; background-color: #1a1a1a; color: #fff; 
-            border: 1px solid #444; border-radius: 4px; 
-            font-size: 11px; font-weight: bold; cursor: pointer;
-            transition: background-color 0.2s, transform 0.1s;
-        }
-        button.active { background-color: var(--hrc-red) !important; border-color: var(--hrc-red); }
-    </style>
+    button { 
+        flex: 1; height: 100%; background-color: #1a1a1a; color: #fff; 
+        border: 1px solid #444; border-radius: 4px; 
+        font-size: 11px; font-weight: bold; cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    /* データ受信中に赤くなる設定 */
+    button.active { background-color: var(--hrc-red) !important; border-color: var(--hrc-red); }
+</style>
 </head>
 <body>
     <div id="dashboard">
@@ -306,6 +336,7 @@ window.onload = () => {
 </script>
 </body>
 </html>
+
 
 
 
