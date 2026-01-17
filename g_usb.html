@@ -197,8 +197,6 @@ if ('serviceWorker' in navigator) {
         </footer>
     </div>
 <script>
-
- 
 'use strict';
 const NMEA_VENDOR_ID = 0x1546, NMEA_PRODUCT_ID = 0x01A8, IN_ENDPOINT = 2, INTERFACE_NUMBER = 1;
 const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", PULSE_UUID = "f4deb353-a4cf-4ffb-badb-2a5f2e3bb630", TEMP_UUID = "ac98b174-608a-41f2-aa83-7e55432fafa9";
@@ -206,11 +204,14 @@ const MAX_RPM = 14000, RED_ZONE = 12500;
 
 let currentRPM = 0, device = null, nmeaBuffer = '', lastPos = null, lastLapTime = 0;
 let LAP_LINE_P1 = { lat: 0, lon: 0 }, LAP_LINE_P2 = { lat: 0, lon: 0 };
-let gpsThresholdValue = 20, lapCoolDown = 15000, pulseCount = 1; // パルス数初期化
+let gpsThresholdValue = 20, lapCoolDown = 15000, pulseCount = 1;
 let bleDevice, swState = 0, startTime = 0, lapStartTime = 0, lapRecords = [];
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 
-// --- index.html側の設定を読み込み ---
+// --- 通信監視用変数 ---
+let lastUsbDataTime = 0;
+let lastBleDataTime = 0;
+
 function getSettings() {
     const p1Lat = localStorage.getItem('startLineP1Lat'), p1Lon = localStorage.getItem('startLineP1Lon');
     const p2Lat = localStorage.getItem('startLineP2Lat'), p2Lon = localStorage.getItem('startLineP2Lon');
@@ -222,9 +223,7 @@ function getSettings() {
         gpsThresholdValue = parseFloat(localStorage.getItem('gpsThreshold')) || 20;
         lapCoolDown = parseFloat(localStorage.getItem('lapCoolDownTime')) || 15000;
     }
-    // パルス設定の更新 (1未満にならないよう保護)
     pulseCount = (storedPulse && parseInt(storedPulse) > 0) ? parseInt(storedPulse) : 1;
-    console.log("Pulse Setting Loaded:", pulseCount);
 }
 
 function renderLoop() { drawTacho(currentRPM); requestAnimationFrame(renderLoop); }
@@ -233,8 +232,6 @@ function drawTacho(rpm) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const w = canvas.width, h = canvas.height;
     const segments = 60, active = Math.floor((rpm/MAX_RPM)*segments);
-    
-    // 右端までフルに使う設定
     const sX = 40, hY = 65, sY = h-35, rad = sY-hY, curveEnd = 34;
     
     for (let i = 0; i < segments; i++) {
@@ -244,27 +241,20 @@ function drawTacho(rpm) {
             x = sX + rad + Math.cos(ang) * rad; y = hY + rad + Math.sin(ang) * rad;
         } else {
             prog = (i - curveEnd) / (segments - curveEnd);
-            // w-30 まで（右端ギリギリまで）描画を伸ばす
             x = (sX + rad) + (prog * (w - 30 - (sX + rad))); 
             y = hY; ang = -Math.PI / 2;
         }
-        
         let curRpm = (i/segments)*MAX_RPM;
         ctx.fillStyle = i < active ? (curRpm >= RED_ZONE ? "#E4002B" : (curRpm >= 8000 ? "#004098" : "#FFFFFF")) : "#222";
         ctx.save(); ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2); ctx.fillRect(-8, -26, 16, 52); ctx.restore();
         
-        // 目盛りの数字（10, 12など）の描画
         if (Math.round(curRpm/1000) % 2 === 0) {
             let targetIdx = Math.floor(((Math.round(curRpm/1000)*1000)/MAX_RPM)*segments);
             if (i === targetIdx) {
                 ctx.fillStyle = "#FFF"; ctx.font = "bold 24px Arial"; ctx.textAlign = "center";
                 let lx = x, ly = y;
-                if (i <= curveEnd) { 
-                    lx += 65 * Math.cos(ang + Math.PI); ly += 65 * Math.sin(ang + Math.PI); 
-                } else { 
-                    // 数字がパネルに被るのを防ぐため、直線部の数字を「バーの上」に配置
-                    ly -= 50; 
-                }
+                if (i <= curveEnd) { lx += 65 * Math.cos(ang + Math.PI); ly += 65 * Math.sin(ang + Math.PI); }
+                else { ly -= 50; }
                 ctx.fillText(Math.round(curRpm/1000), lx, ly);
             }
         }
@@ -272,7 +262,6 @@ function drawTacho(rpm) {
     document.getElementById('rpm_val').textContent = Math.floor(rpm);
 }
 
-// GPS / NMEA 解析 (省略なし)
 function dmmToDec(dmm, dir) {
     if (!dmm) return NaN;
     const dot = dmm.indexOf('.');
@@ -281,6 +270,9 @@ function dmmToDec(dmm, dir) {
 }
 
 function parseNMEA(line) {
+    // データがパースされた＝USB経由で有効なデータを受信している
+    lastUsbDataTime = Date.now();
+    
     const p = line.split(',');
     if (line.includes('RMC') && p[2] === 'A') { document.getElementById('speed_val').textContent = Math.round(parseFloat(p[7]) * 1.852); }
     if (line.includes('GGA') && p[6] !== '0') {
@@ -307,7 +299,7 @@ async function startUsbGps() {
         await device.open(); if (device.configuration === null) await device.selectConfiguration(1);
         await device.claimInterface(INTERFACE_NUMBER);
         document.getElementById('usbGpsBtn').textContent = "USB CONNECTED";
-        document.getElementById('usbGpsBtn').classList.add('active');
+        
         while (device) {
             const result = await device.transferIn(IN_ENDPOINT, 512);
             if (result.status === 'ok') {
@@ -315,7 +307,10 @@ async function startUsbGps() {
                 nmeaBuffer = lines.pop(); lines.forEach(parseNMEA);
             }
         }
-    } catch (e) { console.error(e); }
+    } catch (e) { 
+        console.error(e); 
+        document.getElementById('usbGpsBtn').classList.remove('active');
+    }
 }
 
 function processLap(exactTime) {
@@ -324,7 +319,6 @@ function processLap(exactTime) {
     updateLapList(); document.getElementById('display1').textContent = timeFormat(lapTime);
 }
 
-// --- BLE 接続 (パルス数計算に対応) ---
 async function ble() {
     try {
         bleDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
@@ -333,16 +327,38 @@ async function ble() {
         
         await p.startNotifications(); 
         p.oncharacteristicvaluechanged = (e) => { 
-            // 修正: 受信パルスを pulseCount で割ってRPMを算出
+            lastBleDataTime = Date.now(); // BLEパルス受信
             let rawHz = e.target.value.getUint16(0, true);
             currentRPM = (rawHz * 60) / pulseCount; 
         };
         
         await t.startNotifications(); 
-        t.oncharacteristicvaluechanged = (e) => { document.getElementById('temp_val').textContent = e.target.value.getUint8(0); };
-        document.getElementById('btConnect').classList.add('active');
+        t.oncharacteristicvaluechanged = (e) => { 
+            lastBleDataTime = Date.now(); // BLE温度受信
+            document.getElementById('temp_val').textContent = e.target.value.getUint8(0); 
+        };
     } catch (e) { console.error(e); }
 }
+
+// --- 通信状態の常時監視タイマー ---
+setInterval(() => {
+    const now = Date.now();
+    // USB監視: 1.5秒途切れたら消灯
+    const usbBtn = document.getElementById('usbGpsBtn');
+    if (now - lastUsbDataTime < 1500 && lastUsbDataTime !== 0) {
+        usbBtn.classList.add('active');
+    } else {
+        usbBtn.classList.remove('active');
+    }
+
+    // BLE監視: 1.5秒途切れたら消灯
+    const bleBtn = document.getElementById('btConnect');
+    if (now - lastBleDataTime < 1500 && lastBleDataTime !== 0) {
+        bleBtn.classList.add('active');
+    } else {
+        bleBtn.classList.remove('active');
+    }
+}, 1000);
 
 function timeFormat(ms) {
     let m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000), mss = Math.floor(ms%1000);
@@ -380,6 +396,7 @@ window.onload = () => { getSettings(); window.dispatchEvent(new Event('resize'))
 </body>
 
 </html>
+
 
 
 
