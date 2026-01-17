@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>HRC Dashboard - Maximum Visibility</title>
-   <style>
+ <style>
     :root { 
         --hrc-red: #E4002B; 
         --hrc-blue: #004098; 
@@ -31,7 +31,6 @@
         width: 100vw; 
     }
 
-    /* タコメーターキャンバス */
     #canvas { 
         position: absolute; 
         top: 0; 
@@ -48,82 +47,74 @@
         pointer-events: none; 
     }
 
-    /* メインUIコンテナ：右端基準、上寄り配置 */
+    /* メインUIコンテナ：全体を少し下げ、履歴パネルに高さを合わせる */
     .main-ui-container {
         position: absolute; 
         right: 5px; 
-        top: 105px; /* バーの直下 */
-        bottom: 10px;
+        top: 130px; /* 位置を下げてバーとの距離を確保 */
+        bottom: 15px;
         display: flex; 
-        align-items: flex-start; /* 上揃え */
-        gap: 55px; /* 数値群と履歴パネルの間の余白を拡大 */
+        align-items: flex-start; 
+        gap: 55px; 
         z-index: 20; 
         pointer-events: auto;
     }
 
-    /* 左側：数値表示ユニット（右揃え） */
+    /* 数値表示ユニット */
     #info-overlay { 
         display: flex; 
         flex-direction: column; 
         align-items: flex-end; 
         text-align: right;
-        gap: 0px; 
+        gap: 15px; /* RPMとLAPの間の重なりを防ぐ余白 */
     }
 
-    /* 回転数 */
+    /* 回転数：履歴パネルの上端と揃うように微調整 */
     #rpm_val { 
         font-size: 13vh; 
         font-weight: 900; 
-        line-height: 0.8; 
+        line-height: 0.9; /* 少し広げて重なりを回避 */
+        margin-top: 10px; /* 履歴パネルの上端(padding)との視覚的な高さを合わせる */
         text-shadow: 3px 3px 12px #000; 
     }
 
-    /* 現在のラップタイム：最大強調 */
+    /* 現在のラップタイム：巨大表示のまま重なりを解消 */
     #display1 { 
         font-size: 18vh; 
         font-weight: 900; 
-        line-height: 0.8;
+        line-height: 0.9;
         color: var(--hrc-white);
         text-shadow: 4px 4px 15px #000; 
     }
 
     /* トータルタイム */
     #display { 
-        font-size: 5vh; 
+        font-size: 4.5vh; 
         color: #bbb; 
-        margin-top: 5px;
         text-shadow: 1px 1px 6px #000; 
     }
 
-    /* 右側：パネルユニット（履歴 + SPEED/TEMP） */
+    /* 右側パネルユニット */
     .right-panels {
         display: flex;
         flex-direction: row;
         gap: 5px; 
         height: 100%;
         align-items: flex-start;
-        padding-top: 15px; /* 数値との高さバランス調整 */
+        /* RPMの上端と揃うようにpaddingを調整 */
     }
 
-    /* ラップ履歴パネル */
     #lap-panel { 
         width: 170px; 
         height: 100%; 
         display: flex; 
         flex-direction: column; 
         overflow: hidden; 
+        border-top: 2px solid rgba(255,255,255,0.1); /* 基準線として薄く表示 */
     }
 
-    #lap { 
-        flex: 1; 
-        overflow-y: auto; 
-        scrollbar-width: none; 
-    }
-
-    #lap::-webkit-scrollbar { 
-        display: none; 
-    }
-
+    #lap { flex: 1; overflow-y: auto; scrollbar-width: none; }
+    #lap::-webkit-scrollbar { display: none; }
     .lap-row { 
         display: flex; 
         justify-content: space-between; 
@@ -132,66 +123,16 @@
         font-family: 'Courier New', monospace; 
         font-size: 18px; 
     }
+    .best-lap { color: var(--hrc-red); font-weight: 900; }
 
-    .best-lap { 
-        color: var(--hrc-red); 
-        font-weight: 900; 
-    }
+    .data-panel { display: flex; flex-direction: column; gap: 15px; width: 125px; }
+    .data-box { display: flex; flex-direction: column; align-items: flex-end; }
+    .label { font-size: 11px; color: var(--hrc-red); font-weight: bold; }
+    .val { font-size: 44px; font-weight: 900; line-height: 0.9; text-shadow: 2px 2px 8px #000; }
 
-    /* SPEED & TEMP パネル */
-    .data-panel { 
-        display: flex; 
-        flex-direction: column; 
-        gap: 15px; 
-        width: 125px; 
-    }
-
-    .data-box { 
-        display: flex; 
-        flex-direction: column; 
-        align-items: flex-end; 
-    }
-
-    .label { 
-        font-size: 11px; 
-        color: var(--hrc-red); 
-        font-weight: bold; 
-    }
-
-    .val { 
-        font-size: 44px; 
-        font-weight: 900; 
-        line-height: 0.9; 
-        text-shadow: 2px 2px 8px #000; 
-    }
-
-    /* フッターボタンエリア */
-    footer { 
-        height: 50px; 
-        display: flex; 
-        gap: 4px; 
-        padding: 4px; 
-        background: #000; 
-        border-top: 1px solid #333; 
-        z-index: 100; 
-        position: relative; 
-    }
-
-    button { 
-        flex: 1; 
-        background: #1a1a1a; 
-        color: #fff; 
-        border: 1px solid #444; 
-        border-radius: 4px; 
-        font-size: 10px; 
-        font-weight: bold; 
-        cursor: pointer; 
-    }
-
-    button.active { 
-        background: var(--hrc-red) !important; 
-        color: #fff !important; 
-    }
+    footer { height: 50px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: relative; }
+    button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; }
+    button.active { background: var(--hrc-red) !important; color: #fff !important; }
 </style>
 </head>
 <body>
@@ -329,4 +270,5 @@ window.onload = () => { window.dispatchEvent(new Event('resize')); updateSetting
 </script>
 </body>
 </html>
+
 
