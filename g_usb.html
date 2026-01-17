@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HRC Dashboard - Aligned Layout</title>
+    <title>HRC Dashboard - Maximum Visibility</title>
     <style>
         :root { 
             --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; 
@@ -19,48 +19,48 @@
 
         .top-section { flex: 1; position: relative; z-index: 10; pointer-events: none; }
 
-        /* メインUIコンテナ：全体を右側に配置 */
+        /* 全体コンテナ：右端に寄せる */
         .main-ui-container {
             position: absolute; 
-            right: 10px; 
-            top: 135px; 
+            right: 5px; /* 右端ギリギリまで寄せる */
+            top: 135px; /* バーとの重なりを回避 */
             bottom: 15px;
             display: flex; 
             align-items: flex-end; 
-            gap: 30px; /* 数値群とパネル群の間の固定距離 */
+            gap: 25px; /* 数値とパネルの間隔 */
             z-index: 20; 
             pointer-events: auto;
         }
 
-        /* 数値表示群：ここを基準に右揃え */
+        /* 数値群：巨大化 + 右揃え */
         #info-overlay { 
             display: flex; 
             flex-direction: column; 
-            align-items: flex-end; /* すべて右揃え */
+            align-items: flex-end; 
             text-align: right;
             margin-bottom: 5px;
         }
         #rpm_val { 
-            font-size: 14vh; 
+            font-size: 16vh; /* 最大化 */
             font-weight: 900; 
-            line-height: 0.8; 
-            text-shadow: 2px 2px 8px #000; 
+            line-height: 0.75; 
+            text-shadow: 2px 2px 10px #000; 
         }
         #display1 { 
-            font-size: 13vh; 
+            font-size: 15vh; /* 最大化 */
             font-weight: 900; 
-            margin-top: 5px; 
-            line-height: 0.9;
-            text-shadow: 2px 2px 8px #000; 
+            margin-top: 10px; 
+            line-height: 0.8;
+            text-shadow: 2px 2px 10px #000; 
         }
         #display { 
-            font-size: 4.5vh; 
+            font-size: 5vh; /* 視認性アップ */
             color: #bbb; 
-            margin-top: 2px;
-            text-shadow: 1px 1px 4px #000; 
+            margin-top: 5px;
+            text-shadow: 1px 1px 5px #000; 
         }
 
-        /* 右側パネル群（ラップ履歴・SPEED/TEMP） */
+        /* 右側パネル（履歴 & SPEED/TEMP） */
         .right-panels {
             display: flex;
             flex-direction: row;
@@ -70,7 +70,7 @@
         }
 
         #lap-panel {
-            width: 175px; 
+            width: 170px; 
             height: 100%;
             display: flex; 
             flex-direction: column; 
@@ -81,17 +81,17 @@
         .lap-row { 
             display: flex; 
             justify-content: space-between; 
-            padding: 3px 0; 
+            padding: 4px 0; 
             border-bottom: 1px solid rgba(255,255,255,0.1); 
             font-family: 'Courier New', monospace; 
             font-size: 18px; 
         }
         .best-lap { color: var(--hrc-red); font-weight: 900; }
 
-        .data-panel { display: flex; flex-direction: column; gap: 15px; width: 130px; }
+        .data-panel { display: flex; flex-direction: column; gap: 15px; width: 125px; }
         .data-box { display: flex; flex-direction: column; align-items: flex-end; }
-        .label { font-size: 12px; color: var(--hrc-red); font-weight: bold; }
-        .val { font-size: 46px; font-weight: 900; line-height: 0.9; text-shadow: 2px 2px 8px #000; }
+        .label { font-size: 11px; color: var(--hrc-red); font-weight: bold; }
+        .val { font-size: 44px; font-weight: 900; line-height: 0.9; text-shadow: 2px 2px 8px #000; }
 
         footer { height: 50px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: relative; }
         button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; }
@@ -128,6 +128,8 @@
 </div>
 
 <script>
+// JavaScript部分は変更なしのため、既存のロジックを継承してください。
+// ... (前回のスクリプトをそのまま使用)
 'use strict';
 const NMEA_VENDOR_ID = 0x1546, NMEA_PRODUCT_ID = 0x01A8;
 const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", PULSE_UUID = "f4deb353-a4cf-4ffb-badb-2a5f2e3bb630", TEMP_UUID = "ac98b174-608a-41f2-aa83-7e55432fafa9";
