@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HRC Racing Dashboard - Emphasis Layout</title>
+    <title>HRC Dashboard - Aligned Layout</title>
     <style>
         :root { 
             --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; 
@@ -19,7 +19,7 @@
 
         .top-section { flex: 1; position: relative; z-index: 10; pointer-events: none; }
 
-        /* メインUIコンテナ */
+        /* メインUIコンテナ：全体を右側に配置 */
         .main-ui-container {
             position: absolute; 
             right: 10px; 
@@ -27,43 +27,40 @@
             bottom: 15px;
             display: flex; 
             align-items: flex-end; 
-            gap: 20px; 
+            gap: 30px; /* 数値群とパネル群の間の固定距離 */
             z-index: 20; 
             pointer-events: auto;
         }
 
-        /* 数値群のコンテナ */
+        /* 数値表示群：ここを基準に右揃え */
         #info-overlay { 
             display: flex; 
             flex-direction: column; 
-            align-items: flex-end; 
+            align-items: flex-end; /* すべて右揃え */
             text-align: right;
             margin-bottom: 5px;
         }
-        /* 回転数 */
         #rpm_val { 
             font-size: 14vh; 
             font-weight: 900; 
             line-height: 0.8; 
             text-shadow: 2px 2px 8px #000; 
         }
-        /* 現ラップタイム：大きくして左に寄せる */
         #display1 { 
-            font-size: 13vh; /* さらに大きく */
+            font-size: 13vh; 
             font-weight: 900; 
             margin-top: 5px; 
-            margin-right: 40px; /* 左へオフセット */
+            line-height: 0.9;
             text-shadow: 2px 2px 8px #000; 
         }
-        /* トータルタイム：大きくして左に寄せる */
         #display { 
-            font-size: 4.5vh; /* 少し大きく */
+            font-size: 4.5vh; 
             color: #bbb; 
-            margin-right: 45px; /* 左へオフセット */
+            margin-top: 2px;
             text-shadow: 1px 1px 4px #000; 
         }
 
-        /* 右側パネル群（密着） */
+        /* 右側パネル群（ラップ履歴・SPEED/TEMP） */
         .right-panels {
             display: flex;
             flex-direction: row;
