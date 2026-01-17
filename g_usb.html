@@ -4,99 +4,195 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>HRC Dashboard - Maximum Visibility</title>
-    <style>
-        :root { 
-            --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; 
-        }
-        body, html { 
-            margin: 0; padding: 0; width: 100%; height: 100%; 
-            background-color: var(--bg-dark); color: var(--hrc-white); 
-            font-family: 'Arial Black', sans-serif; overflow: hidden; 
-        }
-        #dashboard { position: relative; display: flex; flex-direction: column; height: 100dvh; width: 100vw; }
+   <style>
+    :root { 
+        --hrc-red: #E4002B; 
+        --hrc-blue: #004098; 
+        --hrc-white: #ffffff; 
+        --bg-dark: #000000; 
+    }
 
-        #canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: calc(100% - 50px) !important; z-index: 1; }
+    body, html { 
+        margin: 0; 
+        padding: 0; 
+        width: 100%; 
+        height: 100%; 
+        background-color: var(--bg-dark); 
+        color: var(--hrc-white); 
+        font-family: 'Arial Black', sans-serif; 
+        overflow: hidden; 
+    }
 
-        .top-section { flex: 1; position: relative; z-index: 10; pointer-events: none; }
+    #dashboard { 
+        position: relative; 
+        display: flex; 
+        flex-direction: column; 
+        height: 100dvh; 
+        width: 100vw; 
+    }
 
-        /* 全体コンテナ：右端に寄せる */
-        .main-ui-container {
-            position: absolute; 
-            right: 5px; /* 右端ギリギリまで寄せる */
-            top: 135px; /* バーとの重なりを回避 */
-            bottom: 15px;
-            display: flex; 
-            align-items: flex-end; 
-            gap: 25px; /* 数値とパネルの間隔 */
-            z-index: 20; 
-            pointer-events: auto;
-        }
+    /* タコメーターキャンバス */
+    #canvas { 
+        position: absolute; 
+        top: 0; 
+        left: 0; 
+        width: 100% !important; 
+        height: calc(100% - 50px) !important; 
+        z-index: 1; 
+    }
 
-        /* 数値群：巨大化 + 右揃え */
-        #info-overlay { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: flex-end; 
-            text-align: right;
-            margin-bottom: 5px;
-        }
-        #rpm_val { 
-            font-size: 16vh; /* 最大化 */
-            font-weight: 900; 
-            line-height: 0.75; 
-            text-shadow: 2px 2px 10px #000; 
-        }
-        #display1 { 
-            font-size: 15vh; /* 最大化 */
-            font-weight: 900; 
-            margin-top: 10px; 
-            line-height: 0.8;
-            text-shadow: 2px 2px 10px #000; 
-        }
-        #display { 
-            font-size: 5vh; /* 視認性アップ */
-            color: #bbb; 
-            margin-top: 5px;
-            text-shadow: 1px 1px 5px #000; 
-        }
+    .top-section { 
+        flex: 1; 
+        position: relative; 
+        z-index: 10; 
+        pointer-events: none; 
+    }
 
-        /* 右側パネル（履歴 & SPEED/TEMP） */
-        .right-panels {
-            display: flex;
-            flex-direction: row;
-            gap: 5px; 
-            height: 100%;
-            align-items: flex-start;
-        }
+    /* メインUIコンテナ：右端基準、上寄り配置 */
+    .main-ui-container {
+        position: absolute; 
+        right: 5px; 
+        top: 105px; /* バーの直下 */
+        bottom: 10px;
+        display: flex; 
+        align-items: flex-start; /* 上揃え */
+        gap: 55px; /* 数値群と履歴パネルの間の余白を拡大 */
+        z-index: 20; 
+        pointer-events: auto;
+    }
 
-        #lap-panel {
-            width: 170px; 
-            height: 100%;
-            display: flex; 
-            flex-direction: column; 
-            overflow: hidden;
-        }
-        #lap { flex: 1; overflow-y: auto; scrollbar-width: none; }
-        #lap::-webkit-scrollbar { display: none; }
-        .lap-row { 
-            display: flex; 
-            justify-content: space-between; 
-            padding: 4px 0; 
-            border-bottom: 1px solid rgba(255,255,255,0.1); 
-            font-family: 'Courier New', monospace; 
-            font-size: 18px; 
-        }
-        .best-lap { color: var(--hrc-red); font-weight: 900; }
+    /* 左側：数値表示ユニット（右揃え） */
+    #info-overlay { 
+        display: flex; 
+        flex-direction: column; 
+        align-items: flex-end; 
+        text-align: right;
+        gap: 0px; 
+    }
 
-        .data-panel { display: flex; flex-direction: column; gap: 15px; width: 125px; }
-        .data-box { display: flex; flex-direction: column; align-items: flex-end; }
-        .label { font-size: 11px; color: var(--hrc-red); font-weight: bold; }
-        .val { font-size: 44px; font-weight: 900; line-height: 0.9; text-shadow: 2px 2px 8px #000; }
+    /* 回転数 */
+    #rpm_val { 
+        font-size: 13vh; 
+        font-weight: 900; 
+        line-height: 0.8; 
+        text-shadow: 3px 3px 12px #000; 
+    }
 
-        footer { height: 50px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: relative; }
-        button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; }
-        button.active { background: var(--hrc-red) !important; color: #fff !important; }
-    </style>
+    /* 現在のラップタイム：最大強調 */
+    #display1 { 
+        font-size: 18vh; 
+        font-weight: 900; 
+        line-height: 0.8;
+        color: var(--hrc-white);
+        text-shadow: 4px 4px 15px #000; 
+    }
+
+    /* トータルタイム */
+    #display { 
+        font-size: 5vh; 
+        color: #bbb; 
+        margin-top: 5px;
+        text-shadow: 1px 1px 6px #000; 
+    }
+
+    /* 右側：パネルユニット（履歴 + SPEED/TEMP） */
+    .right-panels {
+        display: flex;
+        flex-direction: row;
+        gap: 5px; 
+        height: 100%;
+        align-items: flex-start;
+        padding-top: 15px; /* 数値との高さバランス調整 */
+    }
+
+    /* ラップ履歴パネル */
+    #lap-panel { 
+        width: 170px; 
+        height: 100%; 
+        display: flex; 
+        flex-direction: column; 
+        overflow: hidden; 
+    }
+
+    #lap { 
+        flex: 1; 
+        overflow-y: auto; 
+        scrollbar-width: none; 
+    }
+
+    #lap::-webkit-scrollbar { 
+        display: none; 
+    }
+
+    .lap-row { 
+        display: flex; 
+        justify-content: space-between; 
+        padding: 4px 0; 
+        border-bottom: 1px solid rgba(255,255,255,0.1); 
+        font-family: 'Courier New', monospace; 
+        font-size: 18px; 
+    }
+
+    .best-lap { 
+        color: var(--hrc-red); 
+        font-weight: 900; 
+    }
+
+    /* SPEED & TEMP パネル */
+    .data-panel { 
+        display: flex; 
+        flex-direction: column; 
+        gap: 15px; 
+        width: 125px; 
+    }
+
+    .data-box { 
+        display: flex; 
+        flex-direction: column; 
+        align-items: flex-end; 
+    }
+
+    .label { 
+        font-size: 11px; 
+        color: var(--hrc-red); 
+        font-weight: bold; 
+    }
+
+    .val { 
+        font-size: 44px; 
+        font-weight: 900; 
+        line-height: 0.9; 
+        text-shadow: 2px 2px 8px #000; 
+    }
+
+    /* フッターボタンエリア */
+    footer { 
+        height: 50px; 
+        display: flex; 
+        gap: 4px; 
+        padding: 4px; 
+        background: #000; 
+        border-top: 1px solid #333; 
+        z-index: 100; 
+        position: relative; 
+    }
+
+    button { 
+        flex: 1; 
+        background: #1a1a1a; 
+        color: #fff; 
+        border: 1px solid #444; 
+        border-radius: 4px; 
+        font-size: 10px; 
+        font-weight: bold; 
+        cursor: pointer; 
+    }
+
+    button.active { 
+        background: var(--hrc-red) !important; 
+        color: #fff !important; 
+    }
+</style>
 </head>
 <body>
 
@@ -233,3 +329,4 @@ window.onload = () => { window.dispatchEvent(new Event('resize')); updateSetting
 </script>
 </body>
 </html>
+
