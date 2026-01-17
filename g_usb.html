@@ -3,137 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HRC Dashboard - Maximum Visibility</title>
- <style>
-    :root { 
-        --hrc-red: #E4002B; 
-        --hrc-blue: #004098; 
-        --hrc-white: #ffffff; 
-        --bg-dark: #000000; 
-    }
+    <title>HRC Racing Dashboard - Full Integration</title>
+    <style>
+        :root { 
+            --hrc-red: #E4002B; 
+            --hrc-blue: #004098; 
+            --hrc-white: #ffffff; 
+            --bg-dark: #000000; 
+            --hrc-orange: #FFA500;
+        }
 
-    body, html { 
-        margin: 0; 
-        padding: 0; 
-        width: 100%; 
-        height: 100%; 
-        background-color: var(--bg-dark); 
-        color: var(--hrc-white); 
-        font-family: 'Arial Black', sans-serif; 
-        overflow: hidden; 
-    }
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background-color: var(--bg-dark); color: var(--hrc-white); 
+            font-family: 'Arial Black', sans-serif; overflow: hidden; 
+        }
 
-    #dashboard { 
-        position: relative; 
-        display: flex; 
-        flex-direction: column; 
-        height: 100dvh; 
-        width: 100vw; 
-    }
+        #dashboard { position: relative; display: flex; flex-direction: column; height: 100dvh; width: 100vw; }
+        
+        /* タコメーター描画用 */
+        #canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: calc(100% - 50px) !important; z-index: 1; }
+        
+        .top-section { flex: 1; position: relative; z-index: 10; pointer-events: none; }
 
-    #canvas { 
-        position: absolute; 
-        top: 0; 
-        left: 0; 
-        width: 100% !important; 
-        height: calc(100% - 50px) !important; 
-        z-index: 1; 
-    }
+        /* メインUI：回転数と履歴の高さを揃える */
+        .main-ui-container {
+            position: absolute; 
+            right: 5px; 
+            top: 130px; /* バーの高さに合わせて調整 */
+            bottom: 15px;
+            display: flex; 
+            align-items: flex-start; 
+            gap: 55px; /* 数値と履歴の間隔 */
+            z-index: 20; 
+            pointer-events: auto;
+        }
 
-    .top-section { 
-        flex: 1; 
-        position: relative; 
-        z-index: 10; 
-        pointer-events: none; 
-    }
+        /* 数値群（右揃え） */
+        #info-overlay { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: flex-end; 
+            text-align: right;
+            gap: 15px; 
+        }
 
-    /* メインUIコンテナ：全体を少し下げ、履歴パネルに高さを合わせる */
-    .main-ui-container {
-        position: absolute; 
-        right: 5px; 
-        top: 130px; /* 位置を下げてバーとの距離を確保 */
-        bottom: 15px;
-        display: flex; 
-        align-items: flex-start; 
-        gap: 55px; 
-        z-index: 20; 
-        pointer-events: auto;
-    }
+        #rpm_val { 
+            font-size: 13vh; 
+            font-weight: 900; 
+            line-height: 0.9; 
+            margin-top: 10px; /* 履歴枠の上端と視覚的に揃える */
+            text-shadow: 3px 3px 12px #000; 
+        }
 
-    /* 数値表示ユニット */
-    #info-overlay { 
-        display: flex; 
-        flex-direction: column; 
-        align-items: flex-end; 
-        text-align: right;
-        gap: 15px; /* RPMとLAPの間の重なりを防ぐ余白 */
-    }
+        #display1 { 
+            font-size: 18vh; 
+            font-weight: 900; 
+            line-height: 0.9;
+            color: var(--hrc-white);
+            text-shadow: 4px 4px 15px #000; 
+        }
 
-    /* 回転数：履歴パネルの上端と揃うように微調整 */
-    #rpm_val { 
-        font-size: 13vh; 
-        font-weight: 900; 
-        line-height: 0.9; /* 少し広げて重なりを回避 */
-        margin-top: 10px; /* 履歴パネルの上端(padding)との視覚的な高さを合わせる */
-        text-shadow: 3px 3px 12px #000; 
-    }
+        #display { 
+            font-size: 4.5vh; 
+            color: #bbb; 
+            text-shadow: 1px 1px 6px #000; 
+        }
 
-    /* 現在のラップタイム：巨大表示のまま重なりを解消 */
-    #display1 { 
-        font-size: 18vh; 
-        font-weight: 900; 
-        line-height: 0.9;
-        color: var(--hrc-white);
-        text-shadow: 4px 4px 15px #000; 
-    }
+        /* 右側パネル（履歴・SPEED・TEMP） */
+        .right-panels {
+            display: flex;
+            flex-direction: row;
+            gap: 10px; 
+            height: 100%;
+            align-items: flex-start;
+        }
 
-    /* トータルタイム */
-    #display { 
-        font-size: 4.5vh; 
-        color: #bbb; 
-        text-shadow: 1px 1px 6px #000; 
-    }
+        #lap-panel { 
+            width: 170px; 
+            height: 100%; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+            border-top: 2px solid rgba(255,255,255,0.2); 
+        }
 
-    /* 右側パネルユニット */
-    .right-panels {
-        display: flex;
-        flex-direction: row;
-        gap: 5px; 
-        height: 100%;
-        align-items: flex-start;
-        /* RPMの上端と揃うようにpaddingを調整 */
-    }
+        #lap { flex: 1; overflow-y: auto; scrollbar-width: none; }
+        #lap::-webkit-scrollbar { display: none; }
+        .lap-row { 
+            display: flex; justify-content: space-between; padding: 4px 0; 
+            border-bottom: 1px solid rgba(255,255,255,0.1); 
+            font-family: 'Courier New', monospace; font-size: 18px; 
+        }
+        .best-lap { color: var(--hrc-red); font-weight: 900; }
 
-    #lap-panel { 
-        width: 170px; 
-        height: 100%; 
-        display: flex; 
-        flex-direction: column; 
-        overflow: hidden; 
-        border-top: 2px solid rgba(255,255,255,0.1); /* 基準線として薄く表示 */
-    }
+        .data-panel { display: flex; flex-direction: column; gap: 15px; width: 125px; }
+        .data-box { display: flex; flex-direction: column; align-items: flex-end; }
+        .label { font-size: 11px; color: var(--hrc-red); font-weight: bold; }
+        .val { font-size: 44px; font-weight: 900; line-height: 0.9; text-shadow: 2px 2px 8px #000; }
 
-    #lap { flex: 1; overflow-y: auto; scrollbar-width: none; }
-    #lap::-webkit-scrollbar { display: none; }
-    .lap-row { 
-        display: flex; 
-        justify-content: space-between; 
-        padding: 4px 0; 
-        border-bottom: 1px solid rgba(255,255,255,0.1); 
-        font-family: 'Courier New', monospace; 
-        font-size: 18px; 
-    }
-    .best-lap { color: var(--hrc-red); font-weight: 900; }
+        /* フッターボタン */
+        footer { height: 50px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: relative; }
+        
+        button { 
+            flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; 
+            font-size: 10px; font-weight: bold; cursor: pointer; transition: all 0.2s;
+        }
 
-    .data-panel { display: flex; flex-direction: column; gap: 15px; width: 125px; }
-    .data-box { display: flex; flex-direction: column; align-items: flex-end; }
-    .label { font-size: 11px; color: var(--hrc-red); font-weight: bold; }
-    .val { font-size: 44px; font-weight: 900; line-height: 0.9; text-shadow: 2px 2px 8px #000; }
-
-    footer { height: 50px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: relative; }
-    button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; }
-    button.active { background: var(--hrc-red) !important; color: #fff !important; }
-</style>
+        button.waiting { background: var(--hrc-orange) !important; color: #000 !important; }
+        button.active { background: var(--hrc-red) !important; color: #fff !important; }
+    </style>
 </head>
 <body>
 
@@ -165,38 +144,50 @@
 </div>
 
 <script>
-// JavaScript部分は変更なしのため、既存のロジックを継承してください。
-// ... (前回のスクリプトをそのまま使用)
 'use strict';
-const NMEA_VENDOR_ID = 0x1546, NMEA_PRODUCT_ID = 0x01A8;
+
+// 定数・ID設定
+const NMEA_VENDOR_ID = 0x1546, NMEA_PRODUCT_ID = 0x01A8; // u-bloxなど
 const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", PULSE_UUID = "f4deb353-a4cf-4ffb-badb-2a5f2e3bb630", TEMP_UUID = "ac98b174-608a-41f2-aa83-7e55432fafa9";
+
+// 状態管理変数
 let currentRPM = 0, device = null, nmeaBuffer = '', lastPos = null, lastLapTime = 0;
 let LAP_LINE_P1 = { lat: 0, lon: 0 }, LAP_LINE_P2 = { lat: 0, lon: 0 };
 let gpsThresholdValue = 20, lapCoolDown = 30000, pulseCount = 1;
 let swState = 0, startTime = 0, lapStartTime = 0, lapRecords = [];
 let lastUsbDataTime = 0, lastBleDataTime = 0;
+let usbWaiting = false, bleWaiting = false;
+
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 
+// 設定の読み込み
 function updateSettings() {
     const btn = document.getElementById('reloadBtn');
     const p1Lat = localStorage.getItem('startLineP1Lat'), p1Lon = localStorage.getItem('startLineP1Lon');
     const p2Lat = localStorage.getItem('startLineP2Lat'), p2Lon = localStorage.getItem('startLineP2Lon');
     const storedPulse = localStorage.getItem('pl1'), storedThreshold = localStorage.getItem('gpsThreshold'), storedCoolDown = localStorage.getItem('lapCoolDownTime');
+    
     if (p1Lat && p1Lon) {
         LAP_LINE_P1 = { lat: parseFloat(p1Lat), lon: parseFloat(p1Lon) };
         LAP_LINE_P2 = { lat: parseFloat(p2Lat), lon: parseFloat(p2Lon) };
-        pulseCount = parseInt(storedPulse) || 1; gpsThresholdValue = parseFloat(storedThreshold) || 20; lapCoolDown = parseFloat(storedCoolDown) || 30000;
-        btn.style.backgroundColor = '#1a1a1a'; btn.textContent = "RELOAD"; return true;
+        pulseCount = parseInt(storedPulse) || 1;
+        gpsThresholdValue = parseFloat(storedThreshold) || 20;
+        lapCoolDown = parseFloat(storedCoolDown) || 30000;
+        btn.style.backgroundColor = '#1a1a1a'; btn.textContent = "RELOAD";
+        return true;
     } else {
-        btn.style.backgroundColor = '#FFA500'; btn.textContent = "NO SETTING"; return false;
+        btn.style.backgroundColor = '#FFA500'; btn.textContent = "NO SETTING";
+        return false;
     }
 }
 
+// タコメーター描画
 function drawTacho(rpm) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const w = canvas.width, h = canvas.height;
     const segments = 75, active = Math.floor((rpm / 14000) * segments);
     const sX = 20, hY = 80, bY = h - 20, rad = bY - hY, curveEnd = 30;
+
     for (let i = 0; i <= segments; i++) {
         let x, y, ang, prog;
         if (i <= curveEnd) {
@@ -224,10 +215,15 @@ function drawTacho(rpm) {
     document.getElementById('rpm_val').textContent = Math.floor(rpm);
 }
 
+// NMEAパース & タイム計測
 function dmmToDec(dmm, dir) { const dot = dmm.indexOf('.'); const d = parseInt(dmm.substring(0, dot-2)), m = parseFloat(dmm.substring(dot-2)); let dec = d + (m/60); return (dir === 'S' || dir === 'W') ? -dec : dec; }
+
 function parseNMEA(line) {
     const p = line.split(',');
-    if (line.includes('RMC') && p[2] === 'A') { lastUsbDataTime = Date.now(); document.getElementById('speed_val').textContent = Math.round(parseFloat(p[7]) * 1.852); }
+    if (line.includes('RMC') && p[2] === 'A') { 
+        lastUsbDataTime = Date.now(); 
+        document.getElementById('speed_val').textContent = Math.round(parseFloat(p[7]) * 1.852); 
+    }
     if (line.includes('GGA') && p[6] !== '0') {
         lastUsbDataTime = Date.now();
         const currentPos = { lat: dmmToDec(p[2], p[3]), lon: dmmToDec(p[4], p[5]), time: Date.now() };
@@ -245,30 +241,109 @@ function parseNMEA(line) {
         lastPos = currentPos;
     }
 }
-async function startUsbGps() { try { device = await navigator.usb.requestDevice({ filters: [{ vendorId: NMEA_VENDOR_ID, productId: NMEA_PRODUCT_ID }] }); await device.open(); if (device.configuration === null) await device.selectConfiguration(1); await device.claimInterface(1); while (device) { const result = await device.transferIn(2, 512); const lines = (nmeaBuffer + new TextDecoder().decode(result.data)).split(/\r?\n/); nmeaBuffer = lines.pop(); lines.forEach(parseNMEA); } } catch (e) { console.error(e); } }
-async function ble() { try { const bleDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] }); const server = await bleDevice.gatt.connect(), service = await server.getPrimaryService(SERVICE_UUID); const pC = await service.getCharacteristic(PULSE_UUID), tC = await service.getCharacteristic(TEMP_UUID); await pC.startNotifications(); pC.oncharacteristicvaluechanged = (e) => { lastBleDataTime = Date.now(); currentRPM = (e.target.value.getUint16(0, true) * 60) / pulseCount; }; await tC.startNotifications(); tC.oncharacteristicvaluechanged = (e) => { lastBleDataTime = Date.now(); document.getElementById('temp_val').textContent = e.target.value.getUint8(0); }; } catch (e) { console.error(e); } }
+
+// USB GPS 接続
+async function startUsbGps() {
+    try {
+        device = await navigator.usb.requestDevice({ filters: [{ vendorId: NMEA_VENDOR_ID, productId: NMEA_PRODUCT_ID }] });
+        await device.open();
+        usbWaiting = true; 
+        if (device.configuration === null) await device.selectConfiguration(1);
+        await device.claimInterface(1);
+        while (device) {
+            const result = await device.transferIn(2, 512);
+            const lines = (nmeaBuffer + new TextDecoder().decode(result.data)).split(/\r?\n/);
+            nmeaBuffer = lines.pop();
+            lines.forEach(parseNMEA);
+        }
+    } catch (e) { console.error(e); usbWaiting = false; }
+}
+
+// Bluetooth 接続
+async function ble() {
+    try {
+        const bleDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
+        bleWaiting = true;
+        const server = await bleDevice.gatt.connect(), service = await server.getPrimaryService(SERVICE_UUID);
+        const pC = await service.getCharacteristic(PULSE_UUID), tC = await service.getCharacteristic(TEMP_UUID);
+        await pC.startNotifications();
+        pC.oncharacteristicvaluechanged = (e) => { 
+            lastBleDataTime = Date.now(); 
+            currentRPM = (e.target.value.getUint16(0, true) * 60) / pulseCount; 
+        };
+        await tC.startNotifications();
+        tC.oncharacteristicvaluechanged = (e) => { 
+            lastBleDataTime = Date.now(); 
+            document.getElementById('temp_val').textContent = e.target.value.getUint8(0); 
+        };
+    } catch (e) { console.error(e); bleWaiting = false; }
+}
+
+// ラップ処理
 function processLap(exactTime) {
-    const lapTime = exactTime - (lapStartTime || startTime); lapRecords.unshift(lapTime); lapStartTime = exactTime; lastLapTime = exactTime;
-    const d = document.getElementById('lap'); d.innerHTML = ""; const best = Math.min(...lapRecords);
+    const lapTime = exactTime - (lapStartTime || startTime); 
+    lapRecords.unshift(lapTime); 
+    lapStartTime = exactTime; 
+    lastLapTime = exactTime;
+    
+    const d = document.getElementById('lap'); d.innerHTML = ""; 
+    const best = Math.min(...lapRecords);
     lapRecords.forEach((t, i) => {
         const r = document.createElement('div'); r.className = `lap-row ${t === best ? 'best-lap' : ''}`;
         r.innerHTML = `<span>L${lapRecords.length-i}</span><span>${timeFormat(t)}</span>`; d.appendChild(r);
     });
 }
-function timeFormat(ms) { let m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000), mss = Math.floor(ms%1000); return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}.${mss.toString().padStart(3,'0')}`; }
-function tick() { if (swState !== 1) return; document.getElementById('display').textContent = "TOTAL " + timeFormat(Date.now() - startTime); document.getElementById('display1').textContent = timeFormat(Date.now() - lapStartTime); requestAnimationFrame(tick); }
-setInterval(() => { const now = Date.now(); if (now - lastUsbDataTime < 1500 && lastUsbDataTime !== 0) document.getElementById('usbGpsBtn').classList.add('active'); else document.getElementById('usbGpsBtn').classList.remove('active'); if (now - lastBleDataTime < 1500 && lastBleDataTime !== 0) document.getElementById('btConnect').classList.add('active'); else document.getElementById('btConnect').classList.remove('active'); }, 1000);
 
+function timeFormat(ms) { 
+    let m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000), mss = Math.floor(ms%1000); 
+    return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}.${mss.toString().padStart(3,'0')}`; 
+}
+
+function tick() { 
+    if (swState !== 1) return; 
+    document.getElementById('display').textContent = "TOTAL " + timeFormat(Date.now() - startTime); 
+    document.getElementById('display1').textContent = timeFormat(Date.now() - lapStartTime); 
+    requestAnimationFrame(tick); 
+}
+
+// 接続監視ループ
+setInterval(() => {
+    const now = Date.now();
+    const uBtn = document.getElementById('usbGpsBtn'), bBtn = document.getElementById('btConnect');
+
+    if (now - lastUsbDataTime < 1500 && lastUsbDataTime !== 0) {
+        uBtn.className = 'active'; usbWaiting = false;
+    } else if (usbWaiting) { uBtn.className = 'waiting'; } else { uBtn.className = ''; }
+
+    if (now - lastBleDataTime < 1500 && lastBleDataTime !== 0) {
+        bBtn.className = 'active'; bleWaiting = false;
+    } else if (bleWaiting) { bBtn.className = 'waiting'; } else { bBtn.className = ''; }
+}, 1000);
+
+// イベント登録
 document.getElementById('usbGpsBtn').onclick = startUsbGps;
 document.getElementById('btConnect').onclick = ble;
-document.getElementById('startBtn').onclick = () => { if(swState !== 1) { swState = 1; startTime = Date.now(); lapStartTime = startTime; tick(); document.getElementById('startBtn').classList.add('active'); } else { swState = 2; document.getElementById('startBtn').classList.remove('active'); } };
-document.getElementById('lapBtn').onclick = () => { if(swState === 1) processLap(Date.now()); else { swState = 0; lapRecords = []; document.getElementById('lap').innerHTML = ""; document.getElementById('display1').textContent = "00:00.000"; } };
+document.getElementById('startBtn').onclick = () => { 
+    if(swState !== 1) { 
+        swState = 1; startTime = Date.now(); lapStartTime = startTime; tick(); 
+        document.getElementById('startBtn').classList.add('active'); 
+    } else { 
+        swState = 2; document.getElementById('startBtn').classList.remove('active'); 
+    } 
+};
+document.getElementById('lapBtn').onclick = () => { 
+    if(swState === 1) processLap(Date.now()); 
+    else { 
+        swState = 0; lapRecords = []; 
+        document.getElementById('lap').innerHTML = ""; 
+        document.getElementById('display1').textContent = "00:00.000"; 
+    } 
+};
 document.getElementById('reloadBtn').onclick = () => { if(updateSettings()) { document.getElementById('reloadBtn').style.backgroundColor = '#004098'; setTimeout(updateSettings, 800); } };
 
 window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight - 50; };
 window.onload = () => { window.dispatchEvent(new Event('resize')); updateSettings(); (function renderLoop() { drawTacho(currentRPM); requestAnimationFrame(renderLoop); })(); };
+
 </script>
 </body>
 </html>
-
-
