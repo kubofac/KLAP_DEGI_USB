@@ -30,131 +30,77 @@ if ('serviceWorker' in navigator) {
     <title>KLAP_DEGI_USB</title>
 <style>
     :root { 
-        --hrc-red: #E4002B; 
-        --hrc-blue: #004098; 
-        --hrc-white: #ffffff; 
-        --bg-dark: #000000; 
+        --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; 
     }
 
-    /* 全体設定 */
     body, html { 
         margin: 0; padding: 0; width: 100%; height: 100%; 
         background-color: var(--bg-dark); color: var(--hrc-white); 
         font-family: 'Arial Black', sans-serif; overflow: hidden; 
     }
 
-    /* 最上部：HRCライン */
-    .hrc-line { 
-        height: 4px; display: flex; width: 100%; 
-        position: fixed; top: 0; left: 0; z-index: 100; 
-    }
-    .b { background: var(--hrc-blue); flex: 1; } 
-    .w { background: var(--hrc-white); flex: 1; } 
-    .r { background: var(--hrc-red); flex: 1; }
+    .hrc-line { height: 4px; display: flex; width: 100%; position: fixed; top: 0; z-index: 100; }
+    .b { background: var(--hrc-blue); flex: 1; } .w { background: var(--hrc-white); flex: 1; } .r { background: var(--hrc-red); flex: 1; }
 
-    /* メインコンテナ：縦に「メイン(1fr)」と「ボタン(45px)」を分ける */
-    #dashboard { 
-        display: flex;
-        flex-direction: column;
-        height: 100dvh;
-        width: 100vw;
-        box-sizing: border-box;
-        padding-top: 4px; /* HRCラインの厚み分 */
-    }
+    #dashboard { display: flex; flex-direction: column; height: 100dvh; width: 100vw; padding-top: 4px; }
+    .top-section { flex: 1; position: relative; overflow: hidden; }
 
-    /* 上部エリア：メーター（背景）とパネル（前景）が混在する領域 */
-    .top-section {
-        flex: 1; 
-        position: relative;
-        overflow: hidden; 
-    }
-
-    /* タコメーター：絶対配置で画面全体（100%）に広げる */
-    #tacho-layer { 
-        position: absolute;
-        top: 0; left: 0;
-        width: 100%; 
-        height: 100%;
-        z-index: 1;
-    }
+    /* タコメーター背面 */
+    #tacho-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
     #canvas { width: 100%; height: 100%; display: block; }
 
-    /* 中央数値表示：メーターの内側に収める */
+    /* メイン表示：巨大化 & 左配置 */
     #info-overlay { 
-        position: absolute; top: 60%; left: 35%; 
+        position: absolute; top: 62%; left: 32%; 
         transform: translate(-50%, -50%); 
         display: flex; flex-direction: column; align-items: center; 
         pointer-events: none; z-index: 10; 
     }
-    #rpm_val { font-size: 15vh; font-weight: 900; line-height: 1; }
-    #display1 { font-size: 8vh; font-weight: 900; line-height: 1; }
-    #display { font-size: 2.5vh; color: #888; margin-top: 5px; }
+    #rpm_val { font-size: 20vh; font-weight: 900; line-height: 0.9; }
+    #display1 { font-size: 11vh; font-weight: 900; line-height: 1; }
+    #display { font-size: 3vh; color: #aaa; margin-top: 5px; }
 
-    /* 【重要】右側パネル：バーを避けるため top: 60px で下げる */
+    /* 【ここが重要】右側パネル：さらに下げて(top: 80px) 重なりを回避 */
     .right-panels { 
-        position: absolute;
-        right: 15px;    /* 右端に少し隙間 */
-        top: 60px;      /* バーの通り道を確保するために下げる */
-        width: 350px;   /* パネル合計幅 */
-        height: calc(100% - 70px); /* ボタンに被らない高さ */
+        position: absolute; 
+        right: 10px; 
+        top: 80px;      /* 以前よりさらに下げました。バーはこの上を通ります */
+        width: 230px;   /* さらに幅を詰めました */
+        height: calc(100% - 90px); /* 下のボタンとの干渉を防ぐ */
         display: grid; 
-        grid-template-columns: 210px 130px; 
-        gap: 10px; 
-        box-sizing: border-box;
-        z-index: 20;
+        grid-template-columns: 145px 75px; 
+        gap: 8px; z-index: 20;
     }
 
-    /* ラップ履歴：独立してスクロール可能 */
+    /* ラップ履歴：スリム化 */
     #col-2 { 
-        background: rgba(20, 20, 20, 0.7); 
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 4px; 
-        overflow-y: auto; 
-        height: 100%; 
-        scrollbar-width: none;
+        background: rgba(20, 20, 20, 0.7); border: 1px solid #444; border-radius: 4px; 
+        overflow-y: auto; height: 100%; scrollbar-width: none;
     }
-    #col-2::-webkit-scrollbar { display: none; } /* Chrome用スクロールバー非表示 */
-
     .lap-row { 
         display: flex; justify-content: space-between; 
-        padding: 10px; border-bottom: 1px solid #222; 
-        font-family: 'monospace'; font-size: 18px; 
+        padding: 4px 6px; border-bottom: 1px solid #222; 
+        font-family: 'monospace'; font-size: 15px; font-weight: bold;
     }
-    .best-lap { color: var(--hrc-red); background: rgba(228, 0, 43, 0.2); border-left: 4px solid var(--hrc-red); }
+    .best-lap { color: var(--hrc-red); background: rgba(228, 0, 43, 0.2); }
 
-    /* SPEED/TEMPボックス */
-    #col-3 { display: flex; flex-direction: column; gap: 10px; height: 100%; }
+    /* SPEED/TEMP：ラベルを上に配置 */
+    #col-3 { display: flex; flex-direction: column; gap: 8px; }
     .data-box { 
-        background: rgba(20, 20, 20, 0.7); 
-        padding: 10px; 
-        border-top: 3px solid var(--hrc-blue); 
-        flex: 1; 
-        display: flex; 
-        flex-direction: column; 
-        justify-content: center; 
-        min-height: 80px;
+        background: rgba(20, 20, 20, 0.7); padding: 4px; 
+        border-top: 3px solid var(--hrc-blue); flex: 1; 
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
     }
-    .label { font-size: 10px; color: var(--hrc-red); font-weight: bold; }
-    .val { font-size: 38px; font-weight: 900; text-align: right; line-height: 1; }
-    .unit { font-size: 11px; text-align: right; color: #aaa; }
+    .label { font-size: 8px; color: var(--hrc-red); margin-bottom: 2px; }
+    .val { font-size: 28px; font-weight: 900; line-height: 1; }
+    .unit { font-size: 9px; color: #aaa; }
 
-    /* 最下部：ボタン固定 */
     footer { 
-        height: 45px; 
-        display: flex; 
-        gap: 4px; 
-        padding: 4px; 
-        background: #000; 
-        border-top: 1px solid #333;
-        z-index: 100;
+        height: 45px; display: flex; gap: 4px; padding: 4px; 
+        background: #000; border-top: 1px solid #333; z-index: 100;
     }
-    button { 
-        flex: 1; height: 100%; 
-        background: #1a1a1a; color: #fff; 
-        border: 1px solid #444; border-radius: 4px; 
-        font-size: 12px; font-weight: bold; cursor: pointer;
-    }
-    button.active { background: var(--hrc-red); border-color: var(--hrc-red); }
+    button { flex: 1; height: 100%; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; }
+    button.active { background: var(--hrc-red); }
 </style>
 </head>
 <body>
@@ -369,6 +315,7 @@ window.onload = () => { getSettings(); window.dispatchEvent(new Event('resize'))
 </body>
 
 </html>
+
 
 
 
