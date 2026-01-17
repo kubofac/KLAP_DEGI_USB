@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HRC Racing Dashboard - Tight Layout</title>
+    <title>HRC Racing Dashboard - Emphasis Layout</title>
     <style>
         :root { 
             --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; 
@@ -19,20 +19,20 @@
 
         .top-section { flex: 1; position: relative; z-index: 10; pointer-events: none; }
 
-        /* メインUIコンテナ：右端配置 */
+        /* メインUIコンテナ */
         .main-ui-container {
             position: absolute; 
             right: 10px; 
-            top: 135px; /* バー(80px)との重なりを避けるため下げました */
+            top: 135px; 
             bottom: 15px;
             display: flex; 
             align-items: flex-end; 
-            gap: 30px; /* 数値群とパネル群の距離 */
+            gap: 20px; 
             z-index: 20; 
             pointer-events: auto;
         }
 
-        /* 数値群（RPM, LAP TIME...）右揃え */
+        /* 数値群のコンテナ */
         #info-overlay { 
             display: flex; 
             flex-direction: column; 
@@ -40,20 +40,38 @@
             text-align: right;
             margin-bottom: 5px;
         }
-        #rpm_val { font-size: 14vh; font-weight: 900; line-height: 0.8; text-shadow: 2px 2px 8px #000; }
-        #display1 { font-size: 10vh; font-weight: 900; margin-top: 5px; text-shadow: 2px 2px 8px #000; }
-        #display { font-size: 3vh; color: #bbb; text-shadow: 1px 1px 4px #000; }
+        /* 回転数 */
+        #rpm_val { 
+            font-size: 14vh; 
+            font-weight: 900; 
+            line-height: 0.8; 
+            text-shadow: 2px 2px 8px #000; 
+        }
+        /* 現ラップタイム：大きくして左に寄せる */
+        #display1 { 
+            font-size: 13vh; /* さらに大きく */
+            font-weight: 900; 
+            margin-top: 5px; 
+            margin-right: 40px; /* 左へオフセット */
+            text-shadow: 2px 2px 8px #000; 
+        }
+        /* トータルタイム：大きくして左に寄せる */
+        #display { 
+            font-size: 4.5vh; /* 少し大きく */
+            color: #bbb; 
+            margin-right: 45px; /* 左へオフセット */
+            text-shadow: 1px 1px 4px #000; 
+        }
 
-        /* 右側パネル群：密着配置 */
+        /* 右側パネル群（密着） */
         .right-panels {
             display: flex;
             flex-direction: row;
-            gap: 5px; /* ここを極限まで詰めました */
+            gap: 5px; 
             height: 100%;
             align-items: flex-start;
         }
 
-        /* ラップ履歴 */
         #lap-panel {
             width: 175px; 
             height: 100%;
@@ -73,7 +91,6 @@
         }
         .best-lap { color: var(--hrc-red); font-weight: 900; }
 
-        /* SPEED & TEMP */
         .data-panel { display: flex; flex-direction: column; gap: 15px; width: 130px; }
         .data-box { display: flex; flex-direction: column; align-items: flex-end; }
         .label { font-size: 12px; color: var(--hrc-red); font-weight: bold; }
