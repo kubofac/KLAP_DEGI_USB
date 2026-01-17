@@ -101,7 +101,7 @@ let lastUsbDataTime = 0, lastBleDataTime = 0;
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 
 /**
- * 2. 設定読み込みとボタン色更新（診断ログ強化版）
+ * 2. 設定読み込みとボタン色更新（診断ログ・強制着色版）
  */
 function updateSettings() {
     const reloadBtn = document.getElementById('reloadBtn');
@@ -116,7 +116,7 @@ function updateSettings() {
     const storedThreshold = localStorage.getItem('gpsThreshold');
     const storedCoolDown = localStorage.getItem('lapCoolDownTime');
 
-    // --- 詳細コンソールログ（すべての値をチェック） ---
+    // --- 詳細ログ表示 ---
     console.log("--- Detail Data Check ---");
     console.log("P1 Lat/Lon:", p1Lat, p1Lon);
     console.log("P2 Lat/Lon:", p2Lat, p2Lon);
@@ -124,26 +124,28 @@ function updateSettings() {
     console.log("GPS Threshold:", storedThreshold);
     console.log("CoolDown Time:", storedCoolDown);
 
-    // 座標さえあれば、最低限の動作は可能として処理
+    // 座標が存在すれば「設定あり」とみなす
     if (p1Lat && p1Lon && p2Lat && p2Lon) {
         LAP_LINE_P1 = { lat: parseFloat(p1Lat), lon: parseFloat(p1Lon) };
         LAP_LINE_P2 = { lat: parseFloat(p2Lat), lon: parseFloat(p2Lon) };
         
-        // 数値データの反映（nullの場合はデフォルト値を使用）
+        // 数値の反映（LocalStorageが空ならデフォルト値を使用）
         pulseCount = parseInt(storedPulse) || 1;
         gpsThresholdValue = parseFloat(storedThreshold) || 20;
         lapCoolDown = parseFloat(storedCoolDown) || 30000;
 
-        // 【色変更の強制適用】style.setProperty を使い CSS の定義を上書きします
+        // 【重要】CSSの優先順位に勝つために setProperty を使用
         reloadBtn.style.setProperty('background-color', '#1a1a1a', 'important');
         reloadBtn.style.setProperty('color', '#ffffff', 'important');
         reloadBtn.textContent = "RELOAD";
+        console.log("Status: SETTING OK (Gray)");
         return true;
     } else {
         // 設定不足：オレンジ
         reloadBtn.style.setProperty('background-color', '#FFA500', 'important');
         reloadBtn.style.setProperty('color', '#000000', 'important');
         reloadBtn.textContent = "NO SETTING";
+        console.log("Status: NO SETTING (Orange)");
         return false;
     }
 }
@@ -153,32 +155,30 @@ function updateSettings() {
  */
 // RELOADボタンのクリック処理
 document.getElementById('reloadBtn').addEventListener('click', function() {
-    console.log("Reload Clicked");
+    console.log("Reload Button Clicked");
     this.style.transform = "scale(0.9)";
     
     const success = updateSettings();
 
     if (success) {
-        // 成功時：一時的に HRC Blue (青) に
+        // 読み込み成功：一時的に青く光らせる
         this.style.setProperty('background-color', '#004098', 'important');
         this.style.setProperty('color', '#ffffff', 'important');
         this.textContent = "LOADED!";
         setTimeout(() => {
             this.style.transform = "scale(1)";
-            updateSettings(); // 元の色に戻す
+            updateSettings(); // 元のグレーに戻す
         }, 800);
     } else {
-        // 失敗時
+        // 失敗
         setTimeout(() => { this.style.transform = "scale(1)"; }, 150);
-        alert("LocalStorageに座標データがありません。設定ツールで保存してください。");
+        alert("設定データが不十分です。設定ツールで座標を保存してください。");
     }
 });
 
-// GPS / BLE の接続処理
+// 各種ボタン
 document.getElementById('usbGpsBtn').onclick = startUsbGps;
 document.getElementById('btConnect').onclick = ble;
-
-// タイマー制御
 document.getElementById('startBtn').onclick = () => { 
     if(swState!==1){ 
         swState=1; startTime=Date.now(); lapStartTime=startTime; tick(); 
@@ -188,14 +188,13 @@ document.getElementById('startBtn').onclick = () => {
         document.getElementById('startBtn').classList.remove('active'); 
     } 
 };
-
 document.getElementById('lapBtn').onclick = () => { 
     if(swState===1){ processLap(Date.now()); } 
     else { swState=0; lapRecords=[]; document.getElementById('lap').innerHTML=""; document.getElementById('display1').textContent="00:00.000"; } 
 };
 
 /**
- * 4. GPS / BLE ロジック
+ * 4. GPS / BLE / Timer ロジック
  */
 async function startUsbGps() {
     try {
@@ -207,7 +206,7 @@ async function startUsbGps() {
             const lines = (nmeaBuffer + new TextDecoder().decode(result.data)).split(/\r?\n/);
             nmeaBuffer = lines.pop(); lines.forEach(parseNMEA);
         }
-    } catch (e) { console.error("USB GPS Error:", e); }
+    } catch (e) { console.error(e); }
 }
 
 function parseNMEA(line) {
@@ -244,12 +243,9 @@ async function ble() {
         const p = await service.getCharacteristic(PULSE_UUID), t = await service.getCharacteristic(TEMP_UUID);
         await p.startNotifications(); p.oncharacteristicvaluechanged = (e) => { lastBleDataTime = Date.now(); currentRPM = (e.target.value.getUint16(0, true) * 60) / pulseCount; };
         await t.startNotifications(); t.oncharacteristicvaluechanged = (e) => { lastBleDataTime = Date.now(); document.getElementById('temp_val').textContent = e.target.value.getUint8(0); };
-    } catch (e) { console.error("BLE Error:", e); }
+    } catch (e) { console.error(e); }
 }
 
-/**
- * 5. 描画・ユーティリティ
- */
 function drawTacho(rpm) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const w = canvas.width, h = canvas.height;
@@ -295,14 +291,12 @@ function tick() {
     requestAnimationFrame(tick);
 }
 
-// 通信状態LED
 setInterval(() => {
     const now = Date.now();
     if (now - lastUsbDataTime < 1500 && lastUsbDataTime !== 0) document.getElementById('usbGpsBtn').classList.add('active'); else document.getElementById('usbGpsBtn').classList.remove('active');
     if (now - lastBleDataTime < 1500 && lastBleDataTime !== 0) document.getElementById('btConnect').classList.add('active'); else document.getElementById('btConnect').classList.remove('active');
 }, 1000);
 
-// 初期化
 window.onresize = () => { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; };
 window.onload = () => { 
     window.dispatchEvent(new Event('resize')); 
@@ -312,5 +306,6 @@ window.onload = () => {
 </script>
 </body>
 </html>
+
 
 
