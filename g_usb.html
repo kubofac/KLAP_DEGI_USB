@@ -212,17 +212,36 @@ const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 let lastUsbDataTime = 0;
 let lastBleDataTime = 0;
 
+// --- ストレージ読み込み 兼 状態チェック ---
 function getSettings() {
     const p1Lat = localStorage.getItem('startLineP1Lat'), p1Lon = localStorage.getItem('startLineP1Lon');
     const p2Lat = localStorage.getItem('startLineP2Lat'), p2Lon = localStorage.getItem('startLineP2Lon');
     const storedPulse = localStorage.getItem('pulseCount');
+    const reloadBtn = document.getElementById('reloadBtn');
 
-    if (p1Lat && p2Lat) {
+    // 必須設定（計測ラインの座標）があるかチェック
+    if (p1Lat && p1Lon && p2Lat && p2Lon) {
         LAP_LINE_P1 = { lat: parseFloat(p1Lat), lon: parseFloat(p1Lon) };
         LAP_LINE_P2 = { lat: parseFloat(p2Lat), lon: parseFloat(p2Lon) };
         gpsThresholdValue = parseFloat(localStorage.getItem('gpsThreshold')) || 20;
         lapCoolDown = parseFloat(localStorage.getItem('lapCoolDownTime')) || 15000;
+        
+        // 設定がある場合は通常色
+        if (reloadBtn) {
+            reloadBtn.style.backgroundColor = ""; 
+            reloadBtn.textContent = "RELOAD";
+        }
+    } else {
+        // 設定が空（初期状態）の場合は警告のオレンジ色にする
+        console.warn("Storage empty: Using default settings.");
+        if (reloadBtn) {
+            reloadBtn.style.backgroundColor = "#FFA500"; // オレンジ
+            reloadBtn.style.color = "#000";             // 文字を黒にして目立たせる
+            reloadBtn.textContent = "NO SETTING";
+        }
     }
+    
+    // パルス設定の更新
     pulseCount = (storedPulse && parseInt(storedPulse) > 0) ? parseInt(storedPulse) : 1;
 }
 
@@ -270,11 +289,11 @@ function dmmToDec(dmm, dir) {
 }
 
 function parseNMEA(line) {
-    // データがパースされた＝USB経由で有効なデータを受信している
-    lastUsbDataTime = Date.now();
-    
+    lastUsbDataTime = Date.now(); // データが届くたびに時刻更新
     const p = line.split(',');
-    if (line.includes('RMC') && p[2] === 'A') { document.getElementById('speed_val').textContent = Math.round(parseFloat(p[7]) * 1.852); }
+    if (line.includes('RMC') && p[2] === 'A') { 
+        document.getElementById('speed_val').textContent = Math.round(parseFloat(p[7]) * 1.852); 
+    }
     if (line.includes('GGA') && p[6] !== '0') {
         const currentPos = { lat: dmmToDec(p[2], p[3]), lon: dmmToDec(p[4], p[5]), time: Date.now() };
         if (lastPos && swState === 1 && LAP_LINE_P1.lat !== 0) {
@@ -298,7 +317,7 @@ async function startUsbGps() {
         device = await navigator.usb.requestDevice({ filters: [{ vendorId: NMEA_VENDOR_ID, productId: NMEA_PRODUCT_ID }] });
         await device.open(); if (device.configuration === null) await device.selectConfiguration(1);
         await device.claimInterface(INTERFACE_NUMBER);
-        document.getElementById('usbGpsBtn').textContent = "USB CONNECTED";
+        document.getElementById('usbGpsBtn').textContent = "USB ACTIVE";
         
         while (device) {
             const result = await device.transferIn(IN_ENDPOINT, 512);
@@ -313,12 +332,6 @@ async function startUsbGps() {
     }
 }
 
-function processLap(exactTime) {
-    const lapTime = exactTime - (lapStartTime || startTime);
-    lapRecords.unshift(lapTime); lapStartTime = exactTime; lastLapTime = exactTime;
-    updateLapList(); document.getElementById('display1').textContent = timeFormat(lapTime);
-}
-
 async function ble() {
     try {
         bleDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
@@ -327,36 +340,41 @@ async function ble() {
         
         await p.startNotifications(); 
         p.oncharacteristicvaluechanged = (e) => { 
-            lastBleDataTime = Date.now(); // BLEパルス受信
+            lastBleDataTime = Date.now(); 
             let rawHz = e.target.value.getUint16(0, true);
             currentRPM = (rawHz * 60) / pulseCount; 
         };
         
         await t.startNotifications(); 
         t.oncharacteristicvaluechanged = (e) => { 
-            lastBleDataTime = Date.now(); // BLE温度受信
+            lastBleDataTime = Date.now(); 
             document.getElementById('temp_val').textContent = e.target.value.getUint8(0); 
         };
     } catch (e) { console.error(e); }
 }
 
-// --- 通信状態の常時監視タイマー ---
+// --- 統合監視タイマー (1秒おき) ---
 setInterval(() => {
     const now = Date.now();
-    // USB監視: 1.5秒途切れたら消灯
+    
+    // USB通信監視
     const usbBtn = document.getElementById('usbGpsBtn');
-    if (now - lastUsbDataTime < 1500 && lastUsbDataTime !== 0) {
-        usbBtn.classList.add('active');
-    } else {
-        usbBtn.classList.remove('active');
+    if (usbBtn) {
+        if (now - lastUsbDataTime < 1500 && lastUsbDataTime !== 0) {
+            usbBtn.classList.add('active');
+        } else {
+            usbBtn.classList.remove('active');
+        }
     }
 
-    // BLE監視: 1.5秒途切れたら消灯
+    // BLE通信監視
     const bleBtn = document.getElementById('btConnect');
-    if (now - lastBleDataTime < 1500 && lastBleDataTime !== 0) {
-        bleBtn.classList.add('active');
-    } else {
-        bleBtn.classList.remove('active');
+    if (bleBtn) {
+        if (now - lastBleDataTime < 1500 && lastBleDataTime !== 0) {
+            bleBtn.classList.add('active');
+        } else {
+            bleBtn.classList.remove('active');
+        }
     }
 }, 1000);
 
@@ -377,6 +395,12 @@ function updateLapList() {
     });
 }
 
+function processLap(exactTime) {
+    const lapTime = exactTime - (lapStartTime || startTime);
+    lapRecords.unshift(lapTime); lapStartTime = exactTime; lastLapTime = exactTime;
+    updateLapList(); document.getElementById('display1').textContent = timeFormat(lapTime);
+}
+
 function tick() {
     if (swState !== 1) return;
     const now = Date.now();
@@ -385,17 +409,51 @@ function tick() {
     requestAnimationFrame(tick);
 }
 
+// --- 各ボタンのイベント設定 ---
 document.getElementById('usbGpsBtn').onclick = startUsbGps;
 document.getElementById('btConnect').onclick = ble;
-document.getElementById('startBtn').onclick = () => { if(swState!==1){ swState=1; startTime=Date.now(); lapStartTime=startTime; tick(); } else { swState=2; } };
-document.getElementById('lapBtn').onclick = () => { if(swState===1){ processLap(Date.now()); } else { swState=0; lapRecords=[]; updateLapList(); document.getElementById('display1').textContent="00:00.000"; } };
 
-window.onresize = () => { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; };
-window.onload = () => { getSettings(); window.dispatchEvent(new Event('resize')); renderLoop(); };
+// リロードボタン：一瞬凹ませてからリロード
+document.getElementById('reloadBtn').onclick = () => {
+    const btn = document.getElementById('reloadBtn');
+    btn.style.transform = "scale(0.95)";
+    setTimeout(() => { location.reload(); }, 150);
+};
+
+document.getElementById('startBtn').onclick = () => { 
+    if(swState!==1){ 
+        swState=1; startTime=Date.now(); lapStartTime=startTime; tick(); 
+        document.getElementById('startBtn').classList.add('active');
+    } else { 
+        swState=2; 
+        document.getElementById('startBtn').classList.remove('active');
+    } 
+};
+
+document.getElementById('lapBtn').onclick = () => { 
+    if(swState===1){ 
+        processLap(Date.now()); 
+    } else { 
+        swState=0; lapRecords=[]; updateLapList(); 
+        document.getElementById('display1').textContent="00:00.000"; 
+    } 
+};
+
+window.onresize = () => { 
+    canvas.width = canvas.parentElement.clientWidth; 
+    canvas.height = canvas.parentElement.clientHeight; 
+};
+
+window.onload = () => { 
+    getSettings(); 
+    window.dispatchEvent(new Event('resize')); 
+    renderLoop(); 
+};
 </script>
 </body>
 
 </html>
+
 
 
 
