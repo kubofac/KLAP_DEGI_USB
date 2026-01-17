@@ -30,77 +30,143 @@ if ('serviceWorker' in navigator) {
     <title>KLAP_DEGI_USB</title>
 <style>
     :root { 
-        --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; 
+        --hrc-red: #E4002B; 
+        --hrc-blue: #004098; 
+        --hrc-white: #ffffff; 
+        --bg-dark: #000000; 
     }
 
+    /* 基本設定 */
     body, html { 
         margin: 0; padding: 0; width: 100%; height: 100%; 
         background-color: var(--bg-dark); color: var(--hrc-white); 
         font-family: 'Arial Black', sans-serif; overflow: hidden; 
     }
 
-    .hrc-line { height: 4px; display: flex; width: 100%; position: fixed; top: 0; z-index: 100; }
-    .b { background: var(--hrc-blue); flex: 1; } .w { background: var(--hrc-white); flex: 1; } .r { background: var(--hrc-red); flex: 1; }
+    /* HRCカラーライン */
+    .hrc-line { 
+        height: 4px; display: flex; width: 100%; 
+        position: fixed; top: 0; left: 0; z-index: 100; 
+    }
+    .b { background: var(--hrc-blue); flex: 1; } 
+    .w { background: var(--hrc-white); flex: 1; } 
+    .r { background: var(--hrc-red); flex: 1; }
 
-    #dashboard { display: flex; flex-direction: column; height: 100dvh; width: 100vw; padding-top: 4px; box-sizing: border-box; }
-    .top-section { flex: 1; position: relative; overflow: hidden; }
+    /* 全体構造：縦にメインエリアとボタンを分離 */
+    #dashboard { 
+        display: flex; flex-direction: column; 
+        height: 100dvh; width: 100vw; 
+        padding-top: 4px; box-sizing: border-box;
+    }
 
-    #tacho-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+    /* メインエリア */
+    .top-section { 
+        flex: 1; position: relative; overflow: hidden; 
+    }
+
+    /* タコメーター：背面に全画面描画 */
+    #tacho-layer { 
+        position: absolute; top: 0; left: 0; 
+        width: 100%; height: 100%; z-index: 1; 
+    }
     #canvas { width: 100%; height: 100%; display: block; }
 
-    /* 【修正】メイン表示部：右に寄せ(left: 42%)、文字を巨大化 */
+    /* 【重要修正】メイン表示部：右揃え配置 */
+    /* 桁が増えても左側の円弧にぶつからないよう、右端を固定します */
     #info-overlay { 
         position: absolute; 
-        top: 65%; 
-        left: 42%; /* 30%から42%へ移動（右寄り） */
-        transform: translate(-50%, -50%); 
-        display: flex; flex-direction: column; align-items: center; 
-        pointer-events: none; z-index: 10; 
+        top: 68%;       /* バーとの重なりを避けるため少し下げ */
+        left: 48%;      /* 右揃えにする分、基準点を右側に移動 */
+        transform: translateY(-50%); /* 左右の中央合わせを解除し、上下のみ中央に */
+        display: flex; 
+        flex-direction: column; 
+        align-items: flex-end; /* 子要素をすべて右側に寄せる */
+        pointer-events: none; 
+        z-index: 10; 
+        width: 450px;   /* 数字が伸びるための十分な道幅 */
     }
+
     #rpm_val { 
-        font-size: 22vh; /* 18vhから22vhへ拡大 */
-        font-weight: 900; line-height: 0.8; 
+        font-size: 20vh; 
+        font-weight: 900; 
+        line-height: 0.75; 
+        letter-spacing: -2px; 
+        text-align: right; 
     }
+
     #display1 { 
-        font-size: 13vh; /* 10vhから13vhへ拡大 */
-        font-weight: 900; line-height: 1; 
-        margin-top: -10px; /* RPMとの隙間を詰める */
+        font-size: 15vh; /* LAP文字を巨大化 */
+        font-weight: 900; 
+        line-height: 1.0; 
+        margin-top: 15px; /* RPMとの隙間を確保 */
+        color: #fff;
+        text-align: right; 
     }
+
     #display { 
-        font-size: 4vh; /* 3vhから4vhへ拡大 */
-        color: #bbb; font-weight: bold; margin-top: 5px; 
+        font-size: 4.5vh; /* TOTAL文字を大きく */
+        color: #bbb; 
+        font-weight: bold; 
+        margin-top: 5px; 
+        text-align: right; 
     }
 
-    /* 右側パネル：配置は維持、幅を少し最適化 */
+    /* 右側パネル：バーの下（120px以下）に配置 */
     .right-panels { 
-        position: absolute; right: 10px; top: 120px; 
-        width: 250px; height: calc(100% - 130px); 
-        display: grid; grid-template-columns: 160px 80px; 
-        gap: 10px; z-index: 20;
+        position: absolute; 
+        right: 10px; 
+        top: 120px;     /* バーの通り道を確保 */
+        width: 250px; 
+        height: calc(100% - 130px); 
+        display: grid; 
+        grid-template-columns: 160px 80px; 
+        gap: 10px; 
+        z-index: 20;
     }
 
+    /* ラップ履歴：文字サイズ20px */
     #col-2 { 
-        background: rgba(0, 0, 0, 0.8); border: 1px solid rgba(255,255,255,0.2); 
-        border-radius: 4px; overflow-y: auto; height: 100%; scrollbar-width: none;
+        background: rgba(0, 0, 0, 0.8); 
+        border: 1px solid rgba(255,255,255,0.2); 
+        border-radius: 4px; 
+        overflow-y: auto; 
+        height: 100%; 
+        scrollbar-width: none;
     }
+    #col-2::-webkit-scrollbar { display: none; }
+
     .lap-row { 
         display: flex; justify-content: space-between; 
         padding: 10px 8px; border-bottom: 1px solid #333; 
         font-family: 'monospace'; font-size: 20px; font-weight: bold; 
     }
+    .best-lap { color: var(--hrc-red); background: rgba(228, 0, 43, 0.2); }
 
+    /* SPEED/TEMPエリア */
     #col-3 { display: flex; flex-direction: column; gap: 10px; height: 100%; }
     .data-box { 
-        background: rgba(0, 0, 0, 0.8); border-top: 3px solid var(--hrc-blue); 
-        flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: rgba(0, 0, 0, 0.8); 
+        padding: 5px; 
+        border-top: 3px solid var(--hrc-blue); 
+        flex: 1; 
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        min-height: 60px;
     }
-    .label { font-size: 10px; color: var(--hrc-red); font-weight: bold; }
+    .label { font-size: 10px; color: var(--hrc-red); font-weight: bold; margin-bottom: 2px; }
     .val { font-size: 32px; font-weight: 900; line-height: 1; }
-    .unit { font-size: 10px; color: #aaa; }
+    .unit { font-size: 11px; color: #aaa; }
 
-    footer { height: 45px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; }
-    button { flex: 1; height: 100%; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 11px; font-weight: bold; }
-    button.active { background: var(--hrc-red); }
+    /* 最下部：ボタンエリア */
+    footer { 
+        height: 45px; display: flex; gap: 4px; padding: 4px; 
+        background: #000; border-top: 1px solid #333; z-index: 100;
+    }
+    button { 
+        flex: 1; height: 100%; background: #1a1a1a; color: #fff; 
+        border: 1px solid #444; border-radius: 4px; 
+        font-size: 11px; font-weight: bold; cursor: pointer;
+    }
+    button.active { background: var(--hrc-red); border-color: var(--hrc-red); }
 </style>
 </head>
 <body>
@@ -328,6 +394,7 @@ window.onload = () => { getSettings(); window.dispatchEvent(new Event('resize'))
 </body>
 
 </html>
+
 
 
 
