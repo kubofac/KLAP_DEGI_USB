@@ -30,77 +30,104 @@ if ('serviceWorker' in navigator) {
     <title>KLAP_DEGI_USB</title>
 <style>
     :root { 
-        --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; 
+        --hrc-red: #E4002B; 
+        --hrc-blue: #004098; 
+        --hrc-white: #ffffff; 
+        --bg-dark: #000000; 
     }
 
+    /* 基本設定：スクロールを禁止し、画面全体をダッシュボード化 */
     body, html { 
         margin: 0; padding: 0; width: 100%; height: 100%; 
         background-color: var(--bg-dark); color: var(--hrc-white); 
         font-family: 'Arial Black', sans-serif; overflow: hidden; 
     }
 
-    .hrc-line { height: 4px; display: flex; width: 100%; position: fixed; top: 0; z-index: 100; }
-    .b { background: var(--hrc-blue); flex: 1; } .w { background: var(--hrc-white); flex: 1; } .r { background: var(--hrc-red); flex: 1; }
+    /* HRCカラーのトップライン */
+    .hrc-line { 
+        height: 4px; display: flex; width: 100%; 
+        position: fixed; top: 0; left: 0; z-index: 100; 
+    }
+    .b { background: var(--hrc-blue); flex: 1; } 
+    .w { background: var(--hrc-white); flex: 1; } 
+    .r { background: var(--hrc-red); flex: 1; }
 
-    #dashboard { display: flex; flex-direction: column; height: 100dvh; width: 100vw; padding-top: 4px; }
-    .top-section { flex: 1; position: relative; overflow: hidden; }
+    /* 全体構造：メインエリアとボタンエリアを分離 */
+    #dashboard { 
+        display: flex; flex-direction: column; 
+        height: 100dvh; width: 100vw; 
+        padding-top: 4px; box-sizing: border-box;
+    }
 
-    /* タコメーター背面 */
-    #tacho-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+    /* メインエリア：タコメーター(背景)とパネル(前景)を重ねる */
+    .top-section { 
+        flex: 1; position: relative; overflow: hidden; 
+    }
+
+    /* タコメーター：画面の右端までフルに描画領域を確保 */
+    #tacho-layer { 
+        position: absolute; top: 0; left: 0; 
+        width: 100%; height: 100%; z-index: 1; 
+    }
     #canvas { width: 100%; height: 100%; display: block; }
 
-    /* メイン表示：巨大化 & 左配置 */
+    /* 中央のデジタル表示：大きく左寄りに配置して重なりを回避 */
     #info-overlay { 
-        position: absolute; top: 62%; left: 32%; 
+        position: absolute; top: 62%; left: 30%; 
         transform: translate(-50%, -50%); 
         display: flex; flex-direction: column; align-items: center; 
         pointer-events: none; z-index: 10; 
     }
-    #rpm_val { font-size: 20vh; font-weight: 900; line-height: 0.9; }
-    #display1 { font-size: 11vh; font-weight: 900; line-height: 1; }
+    #rpm_val { font-size: 18vh; font-weight: 900; line-height: 0.9; }
+    #display1 { font-size: 10vh; font-weight: 900; line-height: 1; }
     #display { font-size: 3vh; color: #aaa; margin-top: 5px; }
 
-    /* 【ここが重要】右側パネル：さらに下げて(top: 80px) 重なりを回避 */
+    /* 右側パネル：幅を250pxに抑え、半透明にしてバーを透けさせる */
     .right-panels { 
-        position: absolute; 
-        right: 10px; 
-        top: 80px;      /* 以前よりさらに下げました。バーはこの上を通ります */
-        width: 230px;   /* さらに幅を詰めました */
-        height: calc(100% - 90px); /* 下のボタンとの干渉を防ぐ */
-        display: grid; 
-        grid-template-columns: 145px 75px; 
-        gap: 8px; z-index: 20;
+        position: absolute; right: 10px; top: 10px; 
+        width: 250px; height: calc(100% - 20px); 
+        display: grid; grid-template-columns: 155px 85px; 
+        gap: 10px; z-index: 20;
     }
 
-    /* ラップ履歴：スリム化 */
+    /* ラップ履歴：文字サイズを20pxに維持しつつ、背景を半透明に */
     #col-2 { 
-        background: rgba(20, 20, 20, 0.7); border: 1px solid #444; border-radius: 4px; 
-        overflow-y: auto; height: 100%; scrollbar-width: none;
+        background: rgba(0, 0, 0, 0.5); /* バーが透けて見えるよう透過率50% */
+        border: 1px solid rgba(255,255,255,0.2); 
+        border-radius: 4px; overflow-y: auto; height: 100%; 
+        scrollbar-width: none;
     }
+    #col-2::-webkit-scrollbar { display: none; }
+
     .lap-row { 
         display: flex; justify-content: space-between; 
-        padding: 4px 6px; border-bottom: 1px solid #222; 
-        font-family: 'monospace'; font-size: 15px; font-weight: bold;
+        padding: 10px 8px; border-bottom: 1px solid #333; 
+        font-family: 'monospace'; font-size: 20px; font-weight: bold; 
     }
     .best-lap { color: var(--hrc-red); background: rgba(228, 0, 43, 0.2); }
 
-    /* SPEED/TEMP：ラベルを上に配置 */
-    #col-3 { display: flex; flex-direction: column; gap: 8px; }
+    /* SPEED/TEMPエリア */
+    #col-3 { display: flex; flex-direction: column; gap: 10px; }
     .data-box { 
-        background: rgba(20, 20, 20, 0.7); padding: 4px; 
+        background: rgba(0, 0, 0, 0.5); padding: 5px; 
         border-top: 3px solid var(--hrc-blue); flex: 1; 
         display: flex; flex-direction: column; align-items: center; justify-content: center;
     }
-    .label { font-size: 8px; color: var(--hrc-red); margin-bottom: 2px; }
-    .val { font-size: 28px; font-weight: 900; line-height: 1; }
-    .unit { font-size: 9px; color: #aaa; }
+    .label { font-size: 10px; color: var(--hrc-red); font-weight: bold; margin-bottom: 2px; }
+    .val { font-size: 32px; font-weight: 900; line-height: 1; }
+    .unit { font-size: 11px; color: #aaa; }
 
+    /* 最下部：操作ボタン固定 */
     footer { 
         height: 45px; display: flex; gap: 4px; padding: 4px; 
         background: #000; border-top: 1px solid #333; z-index: 100;
     }
-    button { flex: 1; height: 100%; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; }
-    button.active { background: var(--hrc-red); }
+    button { 
+        flex: 1; height: 100%; background: #1a1a1a; color: #fff; 
+        border: 1px solid #444; border-radius: 4px; 
+        font-size: 12px; font-weight: bold; cursor: pointer;
+    }
+    button.active { background: var(--hrc-red); border-color: var(--hrc-red); }
 </style>
 </head>
 <body>
@@ -179,8 +206,12 @@ function renderLoop() { drawTacho(currentRPM); requestAnimationFrame(renderLoop)
 
 function drawTacho(rpm) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const w = canvas.width, h = canvas.height, segments = 60, active = Math.floor((rpm/MAX_RPM)*segments);
+    const w = canvas.width, h = canvas.height;
+    const segments = 60, active = Math.floor((rpm/MAX_RPM)*segments);
+    
+    // 右端までフルに使う設定
     const sX = 40, hY = 65, sY = h-35, rad = sY-hY, curveEnd = 34;
+    
     for (let i = 0; i < segments; i++) {
         let x, y, ang, prog;
         if (i <= curveEnd) {
@@ -188,18 +219,27 @@ function drawTacho(rpm) {
             x = sX + rad + Math.cos(ang) * rad; y = hY + rad + Math.sin(ang) * rad;
         } else {
             prog = (i - curveEnd) / (segments - curveEnd);
-            x = (sX + rad) + (prog * (w - (sX + rad) - 30)); y = hY; ang = -Math.PI / 2;
+            // w-30 まで（右端ギリギリまで）描画を伸ばす
+            x = (sX + rad) + (prog * (w - 30 - (sX + rad))); 
+            y = hY; ang = -Math.PI / 2;
         }
+        
         let curRpm = (i/segments)*MAX_RPM;
         ctx.fillStyle = i < active ? (curRpm >= RED_ZONE ? "#E4002B" : (curRpm >= 8000 ? "#004098" : "#FFFFFF")) : "#222";
         ctx.save(); ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2); ctx.fillRect(-8, -26, 16, 52); ctx.restore();
+        
+        // 目盛りの数字（10, 12など）の描画
         if (Math.round(curRpm/1000) % 2 === 0) {
             let targetIdx = Math.floor(((Math.round(curRpm/1000)*1000)/MAX_RPM)*segments);
             if (i === targetIdx) {
                 ctx.fillStyle = "#FFF"; ctx.font = "bold 24px Arial"; ctx.textAlign = "center";
                 let lx = x, ly = y;
-                if (i <= curveEnd) { lx += 65 * Math.cos(ang + Math.PI); ly += 65 * Math.sin(ang + Math.PI); }
-                else { ly += 75; }
+                if (i <= curveEnd) { 
+                    lx += 65 * Math.cos(ang + Math.PI); ly += 65 * Math.sin(ang + Math.PI); 
+                } else { 
+                    // 数字がパネルに被るのを防ぐため、直線部の数字を「バーの上」に配置
+                    ly -= 50; 
+                }
                 ctx.fillText(Math.round(curRpm/1000), lx, ly);
             }
         }
@@ -315,6 +355,7 @@ window.onload = () => { getSettings(); window.dispatchEvent(new Event('resize'))
 </body>
 
 </html>
+
 
 
 
