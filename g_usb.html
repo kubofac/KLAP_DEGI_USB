@@ -240,23 +240,38 @@ async function startUsbGps() {
 }
 
 function parseNMEA(line) {
-    lastUsbDataTime = Date.now();
     const p = line.split(',');
-    if (line.includes('RMC') && p[2] === 'A') { document.getElementById('speed_val').textContent = Math.round(parseFloat(p[7]) * 1.852); }
-    if (line.includes('GGA') && p[6] !== '0') {
-        const currentPos = { lat: dmmToDec(p[2], p[3]), lon: dmmToDec(p[4], p[5]), time: Date.now() };
-        if (lastPos && swState === 1 && LAP_LINE_P1.lat !== 0) {
-            const dist = Math.sqrt(Math.pow(currentPos.lat - LAP_LINE_P1.lat, 2) + Math.pow(currentPos.lon - LAP_LINE_P1.lon, 2));
-            if (dist * 111320 <= gpsThresholdValue) {
-                const cp1 = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (lastPos.lat - LAP_LINE_P1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (lastPos.lon - LAP_LINE_P1.lon);
-                const cp2 = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (currentPos.lat - LAP_LINE_P1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (currentPos.lon - LAP_LINE_P1.lon);
-                if ((cp1 > 0 && cp2 < 0) || (cp1 < 0 && cp2 > 0)) {
-                    const exactTime = lastPos.time + (currentPos.time - lastPos.time) * (Math.abs(cp1) / (Math.abs(cp1) + Math.abs(cp2)));
-                    if (exactTime - lastLapTime > lapCoolDown) { processLap(exactTime); }
+    
+    // --- RMC文章：ステータスが 'A' (Active/有効) の時だけ更新 ---
+    if (line.includes('RMC')) {
+        if (p[2] === 'A') {
+            lastUsbDataTime = Date.now(); // ここで有効な時だけ時刻を更新（ボタンを赤くする）
+            document.getElementById('speed_val').textContent = Math.round(parseFloat(p[7]) * 1.852);
+        }
+    }
+    
+    // --- GGA文章：測位状態（p[6]）が '0' (未測位) 以外の時だけ更新 ---
+    if (line.includes('GGA')) {
+        const fixQuality = p[6];
+        if (fixQuality !== '0') {
+            lastUsbDataTime = Date.now(); // 有効な測位データが来ている時だけ更新
+            
+            const currentPos = { lat: dmmToDec(p[2], p[3]), lon: dmmToDec(p[4], p[5]), time: Date.now() };
+            
+            // ラップ計測ロジック
+            if (lastPos && swState === 1 && LAP_LINE_P1.lat !== 0) {
+                const dist = Math.sqrt(Math.pow(currentPos.lat - LAP_LINE_P1.lat, 2) + Math.pow(currentPos.lon - LAP_LINE_P1.lon, 2));
+                if (dist * 111320 <= gpsThresholdValue) {
+                    const cp1 = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (lastPos.lat - LAP_LINE_P1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (lastPos.lon - LAP_LINE_P1.lon);
+                    const cp2 = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (currentPos.lat - LAP_LINE_P1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (currentPos.lon - LAP_LINE_P1.lon);
+                    if ((cp1 > 0 && cp2 < 0) || (cp1 < 0 && cp2 > 0)) {
+                        const exactTime = lastPos.time + (currentPos.time - lastPos.time) * (Math.abs(cp1) / (Math.abs(cp1) + Math.abs(cp2)));
+                        if (exactTime - lastLapTime > lapCoolDown) { processLap(exactTime); }
+                    }
                 }
             }
+            lastPos = currentPos;
         }
-        lastPos = currentPos;
     }
 }
 
@@ -336,6 +351,7 @@ window.onload = () => {
 </script>
 </body>
 </html>
+
 
 
 
