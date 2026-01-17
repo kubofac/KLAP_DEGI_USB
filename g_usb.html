@@ -2,23 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#000000">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="manifest" href="/manifest.json">
-
-    <script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/service-worker.js')
-                .then(registration => { console.log('SW registered'); })
-                .catch(err => { console.log('SW failed', err); });
-        });
-    }
-    </script>
-
     <title>KLAP_DEGI_USB</title>
     <style>
         :root { 
@@ -34,14 +18,8 @@
             font-family: 'Arial Black', sans-serif; overflow: hidden; 
         }
 
-        #dashboard { 
-            display: flex; flex-direction: column; 
-            height: 100dvh; width: 100vw; 
-            padding-top: 4px; box-sizing: border-box;
-        }
-
+        #dashboard { display: flex; flex-direction: column; height: 100dvh; width: 100vw; padding-top: 4px; box-sizing: border-box; }
         .top-section { flex: 1; position: relative; overflow: hidden; }
-        #tacho-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         #canvas { width: 100%; height: 100%; display: block; }
 
         #info-overlay { 
@@ -50,43 +28,28 @@
             flex-direction: column; align-items: flex-end; 
             pointer-events: none; z-index: 10; 
         }
-
-        #rpm_val { font-size: 20vh; font-weight: 900; line-height: 0.75; letter-spacing: -2px; text-shadow: 0 0 15px #000; }
+        #rpm_val { font-size: 20vh; font-weight: 900; line-height: 0.75; text-shadow: 0 0 15px #000; }
         #display1 { font-size: 15vh; font-weight: 900; line-height: 1.0; margin-top: 15px; text-shadow: 0 0 15px #000; }
         #display { font-size: 4.5vh; color: #bbb; font-weight: bold; margin-top: 5px; text-shadow: 0 0 10px #000; }
 
-        .right-panels { 
-            position: absolute; right: 15px; top: 120px; 
-            width: 250px; height: calc(100% - 130px); 
-            display: grid; grid-template-columns: 160px 80px; gap: 10px; z-index: 20;
-        }
-
+        .right-panels { position: absolute; right: 15px; top: 120px; width: 250px; height: calc(100% - 130px); display: grid; grid-template-columns: 160px 80px; gap: 10px; z-index: 20; }
         #col-2 { overflow-y: auto; height: 100%; scrollbar-width: none; }
-        #col-2::-webkit-scrollbar { display: none; }
-
-        .lap-row { 
-            display: flex; justify-content: space-between; padding: 6px 0; 
-            border-bottom: 1px solid rgba(255,255,255,0.1); 
-            font-family: 'monospace'; font-size: 20px; font-weight: bold; 
-        }
+        .lap-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-family: 'monospace'; font-size: 20px; font-weight: bold; }
         .best-lap { color: var(--hrc-red); }
 
         .data-box { display: flex; flex-direction: column; align-items: flex-end; margin-bottom: 20px; }
         .label { font-size: 11px; color: var(--hrc-red); font-weight: bold; margin-bottom: -5px; }
         .val { font-size: 36px; font-weight: 900; line-height: 1; }
 
-        footer { 
-            height: 45px; display: flex; gap: 4px; padding: 4px; 
-            background: #000; border-top: 1px solid #333; z-index: 100;
-        }
+        footer { height: 45px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; }
 
+        /* ボタンの基本スタイル */
         button { 
             flex: 1; height: 100%; background-color: #1a1a1a; color: #fff; 
             border: 1px solid #444; border-radius: 4px; 
             font-size: 11px; font-weight: bold; cursor: pointer;
-            transition: background-color 0.2s, transform 0.1s;
+            transition: all 0.2s ease;
         }
-        /* アクティブ（BLE/USB通信中）の色 */
         button.active { background-color: var(--hrc-red) !important; border-color: var(--hrc-red); }
     </style>
 </head>
@@ -101,7 +64,6 @@
                     <div id="display">TOTAL 00:00.000</div>
                 </div>
             </div>
-            
             <div class="right-panels">
                 <div id="col-2"><div id="lap"></div></div>
                 <div id="col-3">
@@ -110,7 +72,6 @@
                 </div>
             </div>
         </div>
-
         <footer>
             <button id="btConnect">BLE START</button>
             <button id="usbGpsBtn">USB GPS</button>
@@ -122,196 +83,93 @@
 
 <script>
 'use strict';
-const NMEA_VENDOR_ID = 0x1546, NMEA_PRODUCT_ID = 0x01A8, IN_ENDPOINT = 2, INTERFACE_NUMBER = 1;
-const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", PULSE_UUID = "f4deb353-a4cf-4ffb-badb-2a5f2e3bb630", TEMP_UUID = "ac98b174-608a-41f2-aa83-7e55432fafa9";
-const MAX_RPM = 14000, RED_ZONE = 12500;
-
 let currentRPM = 0, device = null, nmeaBuffer = '', lastPos = null, lastLapTime = 0;
 let LAP_LINE_P1 = { lat: 0, lon: 0 }, LAP_LINE_P2 = { lat: 0, lon: 0 };
 let gpsThresholdValue = 20, lapCoolDown = 30000, pulseCount = 1;
-let bleDevice, swState = 0, startTime = 0, lapStartTime = 0, lapRecords = [];
+let swState = 0, startTime = 0, lapStartTime = 0, lapRecords = [];
 let lastUsbDataTime = 0, lastBleDataTime = 0;
 
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 
-// --- 設定ツール側のキー名（pl1, gpsThreshold, lapCoolDownTime）に完全対応 ---
+// --- 修正版：ボタンの状態更新を確実に行う関数 ---
 function getSettings() {
     const p1Lat = localStorage.getItem('startLineP1Lat');
     const p1Lon = localStorage.getItem('startLineP1Lon');
     const p2Lat = localStorage.getItem('startLineP2Lat');
     const p2Lon = localStorage.getItem('startLineP2Lon');
-    const storedPulse = localStorage.getItem('pl1');
-    const storedThreshold = localStorage.getItem('gpsThreshold');
-    const storedCoolDown = localStorage.getItem('lapCoolDownTime');
-
     const reloadBtn = document.getElementById('reloadBtn');
 
+    if (!reloadBtn) return false;
+
+    // 座標データが存在するかチェック
     if (p1Lat && p1Lon && p2Lat && p2Lon) {
         LAP_LINE_P1 = { lat: parseFloat(p1Lat), lon: parseFloat(p1Lon) };
         LAP_LINE_P2 = { lat: parseFloat(p2Lat), lon: parseFloat(p2Lon) };
-        gpsThresholdValue = parseFloat(storedThreshold) || 20;
-        lapCoolDown = parseFloat(storedCoolDown) || 30000;
-        pulseCount = parseInt(storedPulse) || 1;
+        gpsThresholdValue = parseFloat(localStorage.getItem('gpsThreshold')) || 20;
+        lapCoolDown = parseFloat(localStorage.getItem('lapCoolDownTime')) || 30000;
+        pulseCount = parseInt(localStorage.getItem('pl1')) || 1;
         
-        if (reloadBtn) {
-            reloadBtn.style.backgroundColor = "#1a1a1a"; 
-            reloadBtn.style.color = "#ffffff";
-            reloadBtn.textContent = "RELOAD";
-        }
+        // 成功：通常のグレーに戻す
+        reloadBtn.style.backgroundColor = "#1a1a1a";
+        reloadBtn.style.color = "#ffffff";
+        reloadBtn.textContent = "RELOAD";
         return true;
     } else {
-        if (reloadBtn) {
-            reloadBtn.style.backgroundColor = "#FFA500"; // 設定なし：オレンジ
-            reloadBtn.style.color = "#000000";
-            reloadBtn.textContent = "NO SETTING";
-        }
+        // 失敗：オレンジにする
+        reloadBtn.style.backgroundColor = "#FFA500";
+        reloadBtn.style.color = "#000000";
+        reloadBtn.textContent = "NO SETTING";
         return false;
     }
 }
 
-// RELOADボタンの動作
-document.getElementById('reloadBtn').onclick = () => {
-    const btn = document.getElementById('reloadBtn');
-    btn.style.transform = "scale(0.9)";
-    
+// RELOADボタンをクリックした時の処理
+document.getElementById('reloadBtn').onclick = function() {
+    this.style.transform = "scale(0.9)";
     const success = getSettings(); 
 
     if (success) {
-        btn.style.backgroundColor = "var(--hrc-blue)"; // 成功時：青
-        btn.style.color = "#ffffff";
-        btn.textContent = "LOADED!";
+        // 読み込み成功時のみ青く光らせる
+        this.style.backgroundColor = "#004098";
+        this.style.color = "#ffffff";
+        this.textContent = "LOADED!";
         setTimeout(() => {
-            btn.style.transform = "scale(1)";
-            btn.style.backgroundColor = "#1a1a1a"; 
-            btn.textContent = "RELOAD";
+            this.style.transform = "scale(1)";
+            this.style.backgroundColor = "#1a1a1a"; 
+            this.textContent = "RELOAD";
         }, 800);
     } else {
-        setTimeout(() => { btn.style.transform = "scale(1)"; }, 150);
+        // 失敗時はオレンジのまま
+        setTimeout(() => { this.style.transform = "scale(1)"; }, 150);
+        console.log("Settings not found in LocalStorage.");
     }
 };
 
-// --- 以下、描画・GPS・BLEロジック（変更なし） ---
-function renderLoop() { drawTacho(currentRPM); requestAnimationFrame(renderLoop); }
-
-function drawTacho(rpm) {
+// --- 以下、基本ロジック ---
+function renderLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const w = canvas.width, h = canvas.height;
-    const segments = 60, active = Math.floor((rpm/MAX_RPM)*segments);
-    const sX = 40, hY = 65, sY = h-35, rad = sY-hY, curveEnd = 34;
-    
+    const segments = 60, active = Math.floor((currentRPM/14000)*segments);
     for (let i = 0; i < segments; i++) {
-        let x, y, ang, prog;
-        if (i <= curveEnd) {
-            prog = i / curveEnd; ang = Math.PI + (prog * Math.PI / 2);
-            x = sX + rad + Math.cos(ang) * rad; y = hY + rad + Math.sin(ang) * rad;
-        } else {
-            prog = (i - curveEnd) / (segments - curveEnd);
-            x = (sX + rad) + (prog * (w - 30 - (sX + rad))); y = hY; ang = -Math.PI / 2;
-        }
-        let curRpm = (i/segments)*MAX_RPM;
-        ctx.fillStyle = i < active ? (curRpm >= RED_ZONE ? "#E4002B" : (curRpm >= 8000 ? "#004098" : "#FFFFFF")) : "#222";
-        ctx.save(); ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2); ctx.fillRect(-8, -26, 16, 52); ctx.restore();
+        let curRpm = (i/segments)*14000;
+        ctx.fillStyle = i < active ? (curRpm >= 12500 ? "#E4002B" : "#FFFFFF") : "#222";
+        ctx.fillRect(i * (w/segments), h-20, (w/segments)-2, 20);
     }
-    document.getElementById('rpm_val').textContent = Math.floor(rpm);
+    document.getElementById('rpm_val').textContent = Math.floor(currentRPM);
+    requestAnimationFrame(renderLoop);
 }
 
-function dmmToDec(dmm, dir) {
-    if (!dmm) return NaN;
-    const dot = dmm.indexOf('.');
-    const d = parseInt(dmm.substring(0, dot-2)), m = parseFloat(dmm.substring(dot-2));
-    let dec = d + (m/60); return (dir === 'S' || dir === 'W') ? -dec : dec;
-}
-
-function parseNMEA(line) {
-    lastUsbDataTime = Date.now();
-    const p = line.split(',');
-    if (line.includes('RMC') && p[2] === 'A') { 
-        document.getElementById('speed_val').textContent = Math.round(parseFloat(p[7]) * 1.852); 
-    }
-    if (line.includes('GGA') && p[6] !== '0') {
-        const currentPos = { lat: dmmToDec(p[2], p[3]), lon: dmmToDec(p[4], p[5]), time: Date.now() };
-        if (lastPos && swState === 1 && LAP_LINE_P1.lat !== 0) {
-            const dist = Math.sqrt(Math.pow(currentPos.lat - LAP_LINE_P1.lat, 2) + Math.pow(currentPos.lon - LAP_LINE_P1.lon, 2));
-            if (dist * 111320 <= gpsThresholdValue) {
-                const cp1 = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (lastPos.lat - LAP_LINE_P1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (lastPos.lon - LAP_LINE_P1.lon);
-                const cp2 = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (currentPos.lat - LAP_LINE_P1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (currentPos.lon - LAP_LINE_P1.lon);
-                if ((cp1 > 0 && cp2 < 0) || (cp1 < 0 && cp2 > 0)) {
-                    const exactTime = lastPos.time + (currentPos.time - lastPos.time) * (Math.abs(cp1) / (Math.abs(cp1) + Math.abs(cp2)));
-                    if (exactTime - lastLapTime > lapCoolDown) { processLap(exactTime); }
-                }
-            }
-        }
-        lastPos = currentPos;
-    }
-}
-
-async function startUsbGps() {
-    try {
-        device = await navigator.usb.requestDevice({ filters: [{ vendorId: NMEA_VENDOR_ID, productId: NMEA_PRODUCT_ID }] });
-        await device.open(); if (device.configuration === null) await device.selectConfiguration(1);
-        await device.claimInterface(INTERFACE_NUMBER);
-        while (device) {
-            const result = await device.transferIn(IN_ENDPOINT, 512);
-            const lines = (nmeaBuffer + new TextDecoder().decode(result.data)).split(/\r?\n/);
-            nmeaBuffer = lines.pop(); lines.forEach(parseNMEA);
-        }
-    } catch (e) { console.error(e); }
-}
-
-async function ble() {
-    try {
-        bleDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
-        const server = await bleDevice.gatt.connect(), service = await server.getPrimaryService(SERVICE_UUID);
-        const p = await service.getCharacteristic(PULSE_UUID), t = await service.getCharacteristic(TEMP_UUID);
-        await p.startNotifications(); p.oncharacteristicvaluechanged = (e) => { lastBleDataTime = Date.now(); currentRPM = (e.target.value.getUint16(0, true) * 60) / pulseCount; };
-        await t.startNotifications(); t.oncharacteristicvaluechanged = (e) => { lastBleDataTime = Date.now(); document.getElementById('temp_val').textContent = e.target.value.getUint8(0); };
-    } catch (e) { console.error(e); }
-}
-
-setInterval(() => {
-    const now = Date.now();
-    const usbBtn = document.getElementById('usbGpsBtn'), bleBtn = document.getElementById('btConnect');
-    if (now - lastUsbDataTime < 1500 && lastUsbDataTime !== 0) usbBtn.classList.add('active'); else usbBtn.classList.remove('active');
-    if (now - lastBleDataTime < 1500 && lastBleDataTime !== 0) bleBtn.classList.add('active'); else bleBtn.classList.remove('active');
-}, 1000);
-
-function timeFormat(ms) {
-    let m = Math.floor(ms/60000), s = Math.floor((ms%60000)/1000), mss = Math.floor(ms%1000);
-    return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}.${mss.toString().padStart(3,'0')}`;
-}
-
-function processLap(exactTime) {
-    const lapTime = exactTime - (lapStartTime || startTime);
-    lapRecords.unshift(lapTime); lapStartTime = exactTime; lastLapTime = exactTime;
-    const d = document.getElementById('lap'); d.innerHTML = "";
-    const best = Math.min(...lapRecords);
-    lapRecords.forEach((t, i) => {
-        const r = document.createElement('div'); r.className = `lap-row ${t === best ? 'best-lap' : ''}`;
-        r.innerHTML = `<span>L${lapRecords.length-i}</span><span>${timeFormat(t)}</span>`; d.appendChild(r);
-    });
-}
-
-function tick() {
-    if (swState !== 1) return;
-    const now = Date.now();
-    document.getElementById('display').textContent = "TOTAL " + timeFormat(now - startTime);
-    document.getElementById('display1').textContent = timeFormat(now - lapStartTime);
-    requestAnimationFrame(tick);
-}
-
-document.getElementById('usbGpsBtn').onclick = startUsbGps;
-document.getElementById('btConnect').onclick = ble;
-document.getElementById('startBtn').onclick = () => { 
-    if(swState!==1){ swState=1; startTime=Date.now(); lapStartTime=startTime; tick(); document.getElementById('startBtn').classList.add('active'); } 
-    else { swState=2; document.getElementById('startBtn').classList.remove('active'); } 
-};
-document.getElementById('lapBtn').onclick = () => { 
-    if(swState===1){ processLap(Date.now()); } 
-    else { swState=0; lapRecords=[]; document.getElementById('lap').innerHTML=""; document.getElementById('display1').textContent="00:00.000"; } 
+window.onresize = () => { 
+    canvas.width = canvas.parentElement.clientWidth; 
+    canvas.height = canvas.parentElement.clientHeight; 
 };
 
-window.onresize = () => { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; };
-window.onload = () => { getSettings(); window.dispatchEvent(new Event('resize')); renderLoop(); };
+// 起動時に実行
+window.onload = () => { 
+    window.dispatchEvent(new Event('resize')); 
+    getSettings(); // ここでボタンの色が決定されます
+    renderLoop(); 
+};
 </script>
 </body>
 </html>
