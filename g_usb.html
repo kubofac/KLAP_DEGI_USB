@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HRC Racing Dashboard - Professional Layout</title>
+    <title>HRC Racing Dashboard - Tight Layout</title>
     <style>
         :root { 
             --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; --bg-dark: #000000; 
@@ -19,42 +19,43 @@
 
         .top-section { flex: 1; position: relative; z-index: 10; pointer-events: none; }
 
-        /* メインUIコンテナ：バー直下、画面右側に集約 */
+        /* メインUIコンテナ：右端配置 */
         .main-ui-container {
             position: absolute; 
-            right: 15px; 
-            top: 85px; /* バー(hY=80)のすぐ下 */
+            right: 10px; 
+            top: 135px; /* バー(80px)との重なりを避けるため下げました */
             bottom: 15px;
             display: flex; 
             align-items: flex-end; 
-            gap: 40px; /* 数値群とパネル群の間隔 */
+            gap: 30px; /* 数値群とパネル群の距離 */
             z-index: 20; 
             pointer-events: auto;
         }
 
-        /* 数値群（RPM, LAP TIME...）を右揃え */
+        /* 数値群（RPM, LAP TIME...）右揃え */
         #info-overlay { 
             display: flex; 
             flex-direction: column; 
             align-items: flex-end; 
             text-align: right;
+            margin-bottom: 5px;
         }
         #rpm_val { font-size: 14vh; font-weight: 900; line-height: 0.8; text-shadow: 2px 2px 8px #000; }
         #display1 { font-size: 10vh; font-weight: 900; margin-top: 5px; text-shadow: 2px 2px 8px #000; }
         #display { font-size: 3vh; color: #bbb; text-shadow: 1px 1px 4px #000; }
 
-        /* 右側パネル群：ラップ履歴とSPEED/TEMPを近づける */
+        /* 右側パネル群：密着配置 */
         .right-panels {
             display: flex;
             flex-direction: row;
-            gap: 15px; /* ラップ履歴とSPEED/TEMPの距離を詰める */
+            gap: 5px; /* ここを極限まで詰めました */
             height: 100%;
             align-items: flex-start;
         }
 
-        /* ラップ履歴（枠なし） */
+        /* ラップ履歴 */
         #lap-panel {
-            width: 180px; 
+            width: 175px; 
             height: 100%;
             display: flex; 
             flex-direction: column; 
@@ -65,18 +66,18 @@
         .lap-row { 
             display: flex; 
             justify-content: space-between; 
-            padding: 4px 0; 
+            padding: 3px 0; 
             border-bottom: 1px solid rgba(255,255,255,0.1); 
-            font-family: monospace; 
-            font-size: 19px; 
+            font-family: 'Courier New', monospace; 
+            font-size: 18px; 
         }
         .best-lap { color: var(--hrc-red); font-weight: 900; }
 
         /* SPEED & TEMP */
-        .data-panel { display: flex; flex-direction: column; gap: 20px; width: 140px; }
+        .data-panel { display: flex; flex-direction: column; gap: 15px; width: 130px; }
         .data-box { display: flex; flex-direction: column; align-items: flex-end; }
-        .label { font-size: 13px; color: var(--hrc-red); font-weight: bold; }
-        .val { font-size: 48px; font-weight: 900; line-height: 0.9; text-shadow: 2px 2px 8px #000; }
+        .label { font-size: 12px; color: var(--hrc-red); font-weight: bold; }
+        .val { font-size: 46px; font-weight: 900; line-height: 0.9; text-shadow: 2px 2px 8px #000; }
 
         footer { height: 50px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: relative; }
         button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; }
@@ -87,29 +88,22 @@
 
 <div id="dashboard">
     <canvas id="canvas"></canvas>
-    
     <div class="top-section">
         <div class="main-ui-container">
-            
             <div id="info-overlay">
                 <div id="rpm_val">0</div>
                 <div id="display1">00:00.000</div>
                 <div id="display">TOTAL 00:00.000</div>
             </div>
-
             <div class="right-panels">
-                <div id="lap-panel">
-                    <div id="lap"></div>
-                </div>
+                <div id="lap-panel"><div id="lap"></div></div>
                 <div class="data-panel">
                     <div class="data-box"><div class="label">SPEED</div><div class="val" id="speed_val">0</div></div>
                     <div class="data-box"><div class="label">TEMP</div><div class="val" id="temp_val">--</div></div>
                 </div>
             </div>
-
         </div>
     </div>
-
     <footer>
         <button id="usbGpsBtn">USB GPS</button>
         <button id="btConnect">BLE START</button>
@@ -177,7 +171,6 @@ function drawTacho(rpm) {
     document.getElementById('rpm_val').textContent = Math.floor(rpm);
 }
 
-// 共通ロジック
 function dmmToDec(dmm, dir) { const dot = dmm.indexOf('.'); const d = parseInt(dmm.substring(0, dot-2)), m = parseFloat(dmm.substring(dot-2)); let dec = d + (m/60); return (dir === 'S' || dir === 'W') ? -dec : dec; }
 function parseNMEA(line) {
     const p = line.split(',');
