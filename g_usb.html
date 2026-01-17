@@ -1,166 +1,140 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
- <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#000000">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" href="/manifest.json">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#000000">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
 
-<script>
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
-            .then(registration => {
-                console.log('Service Worker registered! Scope:', registration.scope);
-            })
-            .catch(err => {
-                console.log('Service Worker registration failed:', err);
-            });
-    });
-}
-</script>
-
-
-
-
-
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(registration => {
+                    console.log('Service Worker registered! Scope:', registration.scope);
+                })
+                .catch(err => {
+                    console.log('Service Worker registration failed:', err);
+                });
+        });
+    }
+    </script>
 
     <title>KLAP_DEGI_USB</title>
-<style>
-    :root { 
-        --hrc-red: #E4002B; 
-        --hrc-blue: #004098; 
-        --hrc-white: #ffffff; 
-        --bg-dark: #000000; 
-    }
+    <style>
+        :root { 
+            --hrc-red: #E4002B; 
+            --hrc-blue: #004098; 
+            --hrc-white: #ffffff; 
+            --bg-dark: #000000; 
+        }
 
-    /* 全体設定 */
-    body, html { 
-        margin: 0; padding: 0; width: 100%; height: 100%; 
-        background-color: var(--bg-dark); color: var(--hrc-white); 
-        font-family: 'Arial Black', sans-serif; overflow: hidden; 
-    }
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            background-color: var(--bg-dark); color: var(--hrc-white); 
+            font-family: 'Arial Black', sans-serif; overflow: hidden; 
+        }
 
-    /* HRCカラーライン */
-    /*.hrc-line { 
-        height: 4px; display: flex; width: 100%; 
-        position: fixed; top: 0; left: 0; z-index: 100; 
-    }
-    .b { background: var(--hrc-blue); flex: 1; } 
-    .w { background: var(--hrc-white); flex: 1; } 
-    .r { background: var(--hrc-red); flex: 1; }
+        #dashboard { 
+            display: flex; flex-direction: column; 
+            height: 100dvh; width: 100vw; 
+            padding-top: 4px; box-sizing: border-box;
+        }
 
-    /* ダッシュボード構造 */
-    #dashboard { 
-        display: flex; flex-direction: column; 
-        height: 100dvh; width: 100vw; 
-        padding-top: 4px; box-sizing: border-box;
-    }
+        .top-section { flex: 1; position: relative; overflow: hidden; }
 
-    .top-section { flex: 1; position: relative; overflow: hidden; }
+        #tacho-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        #canvas { width: 100%; height: 100%; display: block; }
 
-    /* タコメーター・キャンバス */
-    #tacho-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-    #canvas { width: 100%; height: 100%; display: block; }
+        #info-overlay { 
+            position: absolute; 
+            top: 68%; 
+            right: 290px; 
+            transform: translateY(-50%); 
+            display: flex; 
+            flex-direction: column; 
+            align-items: flex-end; 
+            pointer-events: none; 
+            z-index: 10; 
+        }
 
-    /* 【修正】メイン数値表示：rightを270→290に増やして隙間を確保 */
-    #info-overlay { 
-        position: absolute; 
-        top: 68%; 
-        right: 290px; /* 履歴文字との間隔を空けるために数値を増やしました */
-        transform: translateY(-50%); 
-        display: flex; 
-        flex-direction: column; 
-        align-items: flex-end; 
-        pointer-events: none; 
-        z-index: 10; 
-    }
+        #rpm_val { 
+            font-size: 20vh; font-weight: 900; line-height: 0.75; letter-spacing: -2px; 
+            text-align: right; text-shadow: 0 0 15px rgba(0,0,0,1);
+        }
 
-    #rpm_val { 
-        font-size: 20vh; font-weight: 900; line-height: 0.75; letter-spacing: -2px; 
-        text-align: right; text-shadow: 0 0 15px rgba(0,0,0,1);
-    }
+        #display1 { 
+            font-size: 15vh; font-weight: 900; line-height: 1.0; margin-top: 15px; 
+            color: #fff; text-align: right; text-shadow: 0 0 15px rgba(0,0,0,1);
+        }
 
-    #display1 { 
-        font-size: 15vh; font-weight: 900; line-height: 1.0; margin-top: 15px; 
-        color: #fff; text-align: right; text-shadow: 0 0 15px rgba(0,0,0,1);
-    }
+        #display { 
+            font-size: 4.5vh; color: #bbb; font-weight: bold; margin-top: 5px; 
+            text-align: right; text-shadow: 0 0 10px rgba(0,0,0,1);
+        }
 
-    #display { 
-        font-size: 4.5vh; color: #bbb; font-weight: bold; margin-top: 5px; 
-        text-align: right; text-shadow: 0 0 10px rgba(0,0,0,1);
-    }
+        .right-panels { 
+            position: absolute; 
+            right: 15px; 
+            top: 120px; 
+            width: 250px; 
+            height: calc(100% - 130px); 
+            display: grid; 
+            grid-template-columns: 160px 80px; 
+            gap: 10px; 
+            z-index: 20;
+        }
 
-    /* 右側セクション（枠なしフロート表示） */
-    .right-panels { 
-        position: absolute; 
-        right: 15px; 
-        top: 120px; 
-        width: 250px; 
-        height: calc(100% - 130px); 
-        display: grid; 
-        grid-template-columns: 160px 80px; 
-        gap: 10px; 
-        z-index: 20;
-    }
+        #col-2 { 
+            background: none; border: none; overflow-y: auto; 
+            height: 100%; scrollbar-width: none;
+        }
+        #col-2::-webkit-scrollbar { display: none; }
 
-    /* ラップ履歴（枠なし） */
-    #col-2 { 
-        background: none; border: none; overflow-y: auto; 
-        height: 100%; scrollbar-width: none;
-    }
-    #col-2::-webkit-scrollbar { display: none; }
+        .lap-row { 
+            display: flex; justify-content: space-between; padding: 6px 0; 
+            border-bottom: 1px solid rgba(255,255,255,0.1); 
+            font-family: 'monospace'; font-size: 20px; font-weight: bold; 
+            text-shadow: 0 0 8px rgba(0,0,0,1); 
+        }
+        .best-lap { color: var(--hrc-red); text-shadow: 0 0 8px rgba(228,0,43,0.5); }
 
-    .lap-row { 
-        display: flex; justify-content: space-between; padding: 6px 0; 
-        border-bottom: 1px solid rgba(255,255,255,0.1); 
-        font-family: 'monospace'; font-size: 20px; font-weight: bold; 
-        text-shadow: 0 0 8px rgba(0,0,0,1); 
-    }
-    .best-lap { color: var(--hrc-red); text-shadow: 0 0 8px rgba(228,0,43,0.5); }
+        #col-3 { display: flex; flex-direction: column; gap: 20px; height: 100%; }
+        
+        .data-box { 
+            background: none; border: none; padding: 0; 
+            flex: 0; display: flex; flex-direction: column; align-items: flex-end; 
+        }
 
-    /* SPEED/TEMP（枠なし・背景なし） */
-    #col-3 { display: flex; flex-direction: column; gap: 20px; height: 100%; }
-    
-    .data-box { 
-        background: none; border: none; padding: 0; 
-        flex: 0; display: flex; flex-direction: column; align-items: flex-end; 
-    }
+        .label { 
+            font-size: 11px; color: var(--hrc-red); font-weight: bold; 
+            margin-bottom: -5px; text-shadow: 0 0 5px rgba(0,0,0,1);
+        }
+        .val { 
+            font-size: 36px; font-weight: 900; line-height: 1; 
+            text-shadow: 0 0 10px rgba(0,0,0,1);
+        }
 
-    .label { 
-        font-size: 11px; color: var(--hrc-red); font-weight: bold; 
-        margin-bottom: -5px; text-shadow: 0 0 5px rgba(0,0,0,1);
-    }
-    .val { 
-        font-size: 36px; font-weight: 900; line-height: 1; 
-        text-shadow: 0 0 10px rgba(0,0,0,1);
-    }
-    .unit { 
-        font-size: 11px; color: #aaa; 
-        text-shadow: 0 0 5px rgba(0,0,0,1);
-    }
+        footer { 
+            height: 45px; display: flex; gap: 4px; padding: 4px; 
+            background: #000; border-top: 1px solid #333; z-index: 100;
+        }
 
-    /* 下部フッター */
-    footer { 
-        height: 45px; display: flex; gap: 4px; padding: 4px; 
-        background: #000; border-top: 1px solid #333; z-index: 100;
-    }
-    button { 
-        flex: 1; height: 100%; background: #1a1a1a; color: #fff; 
-        border: 1px solid #444; border-radius: 4px; 
-        font-size: 11px; font-weight: bold; cursor: pointer;
-    }
-    button.active { background: var(--hrc-red); border-color: var(--hrc-red); }
-</style>
+        /* 【修正ポイント】background を background-color に変更し transition を追加 */
+        button { 
+            flex: 1; height: 100%; background-color: #1a1a1a; color: #fff; 
+            border: 1px solid #444; border-radius: 4px; 
+            font-size: 11px; font-weight: bold; cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        button.active { background-color: var(--hrc-red) !important; border-color: var(--hrc-red); }
+    </style>
 </head>
 <body>
-    <div class="hrc-line"><div class="b"></div><div class="w"></div><div class="r"></div></div>
-
     <div id="dashboard">
         <div class="top-section">
-            
             <div id="tacho-layer">
                 <canvas id="canvas"></canvas>
                 <div id="info-overlay">
@@ -171,10 +145,7 @@ if ('serviceWorker' in navigator) {
             </div>
             
             <div class="right-panels">
-                <div id="col-2">
-                    <div id="lap"></div>
-                </div>
-
+                <div id="col-2"><div id="lap"></div></div>
                 <div id="col-3">
                     <div class="data-box">
                         <div class="label">SPEED</div>
@@ -196,6 +167,7 @@ if ('serviceWorker' in navigator) {
             <button id="reloadBtn">RELOAD</button>
         </footer>
     </div>
+
 <script>
 'use strict';
 const NMEA_VENDOR_ID = 0x1546, NMEA_PRODUCT_ID = 0x01A8, IN_ENDPOINT = 2, INTERFACE_NUMBER = 1;
@@ -208,9 +180,7 @@ let gpsThresholdValue = 20, lapCoolDown = 15000, pulseCount = 1;
 let bleDevice, swState = 0, startTime = 0, lapStartTime = 0, lapRecords = [];
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 
-// --- 通信監視用変数 ---
-let lastUsbDataTime = 0;
-let lastBleDataTime = 0;
+let lastUsbDataTime = 0, lastBleDataTime = 0;
 
 // --- ストレージ読み込み 兼 状態チェック ---
 function getSettings() {
@@ -225,17 +195,15 @@ function getSettings() {
         gpsThresholdValue = parseFloat(localStorage.getItem('gpsThreshold')) || 20;
         lapCoolDown = parseFloat(localStorage.getItem('lapCoolDownTime')) || 15000;
         
-        // 設定がある場合は通常色
         if (reloadBtn) {
-            reloadBtn.style.backgroundColor = ""; 
-            reloadBtn.style.color = "";
+            reloadBtn.style.backgroundColor = "#1a1a1a"; // 正常時のグレー
+            reloadBtn.style.color = "#ffffff";
             reloadBtn.textContent = "RELOAD";
         }
     } else {
-        // 設定がない場合は警告のオレンジ色
         if (reloadBtn) {
-            reloadBtn.style.backgroundColor = "#FFA500"; 
-            reloadBtn.style.color = "#000";
+            reloadBtn.style.backgroundColor = "#FFA500"; // 警告オレンジ
+            reloadBtn.style.color = "#000000";
             reloadBtn.textContent = "NO SETTING";
         }
     }
@@ -329,14 +297,12 @@ async function ble() {
         bleDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
         const server = await bleDevice.gatt.connect(), service = await server.getPrimaryService(SERVICE_UUID);
         const p = await service.getCharacteristic(PULSE_UUID), t = await service.getCharacteristic(TEMP_UUID);
-        
         await p.startNotifications(); 
         p.oncharacteristicvaluechanged = (e) => { 
             lastBleDataTime = Date.now(); 
             let rawHz = e.target.value.getUint16(0, true);
             currentRPM = (rawHz * 60) / pulseCount; 
         };
-        
         await t.startNotifications(); 
         t.oncharacteristicvaluechanged = (e) => { 
             lastBleDataTime = Date.now(); 
@@ -345,15 +311,13 @@ async function ble() {
     } catch (e) { console.error(e); }
 }
 
-// 通信監視タイマー
 setInterval(() => {
     const now = Date.now();
-    const usbBtn = document.getElementById('usbGpsBtn');
+    const usbBtn = document.getElementById('usbGpsBtn'), bleBtn = document.getElementById('btConnect');
     if (usbBtn) {
         if (now - lastUsbDataTime < 1500 && lastUsbDataTime !== 0) usbBtn.classList.add('active');
         else usbBtn.classList.remove('active');
     }
-    const bleBtn = document.getElementById('btConnect');
     if (bleBtn) {
         if (now - lastBleDataTime < 1500 && lastBleDataTime !== 0) bleBtn.classList.add('active');
         else bleBtn.classList.remove('active');
@@ -391,28 +355,25 @@ function tick() {
     requestAnimationFrame(tick);
 }
 
-// --- ボタンイベントの紐付け ---
 document.getElementById('usbGpsBtn').onclick = startUsbGps;
 document.getElementById('btConnect').onclick = ble;
 
-// RELOADボタン：設定を読み込み、成功時に青く光らせる
+// --- RELOADボタン：色の変化を確実に反映する修正 ---
 document.getElementById('reloadBtn').onclick = () => {
     const btn = document.getElementById('reloadBtn');
-    btn.style.transform = "scale(0.9)"; // 凹ませる
+    btn.style.transform = "scale(0.9)";
     
-    getSettings(); // 設定読み込み実行
+    getSettings();
 
     if (localStorage.getItem('startLineP1Lat')) {
-        // 設定がある場合：一瞬青く光る
         btn.style.backgroundColor = "var(--hrc-blue)";
         btn.textContent = "LOADED!";
         setTimeout(() => {
             btn.style.transform = "scale(1)";
-            btn.style.backgroundColor = ""; 
+            btn.style.backgroundColor = "#1a1a1a"; 
             btn.textContent = "RELOAD";
         }, 600);
     } else {
-        // 設定がない場合：オレンジのまま戻す
         setTimeout(() => { btn.style.transform = "scale(1)"; }, 150);
     }
 };
@@ -439,31 +400,4 @@ window.onresize = () => {
 window.onload = () => { getSettings(); window.dispatchEvent(new Event('resize')); renderLoop(); };
 </script>
 </body>
-
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
