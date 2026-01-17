@@ -193,7 +193,7 @@ if ('serviceWorker' in navigator) {
             <button id="usbGpsBtn">USB GPS</button>
             <button id="startBtn">TIMER START</button>
             <button id="lapBtn">LAP/RESET</button>
-            <button id="configBtn" onclick="getSettings()">RELOAD</button>
+            <button id="reloadBtn">RELOAD</button>
         </footer>
     </div>
 <script>
@@ -219,7 +219,6 @@ function getSettings() {
     const storedPulse = localStorage.getItem('pulseCount');
     const reloadBtn = document.getElementById('reloadBtn');
 
-    // 必須設定（計測ラインの座標）があるかチェック
     if (p1Lat && p1Lon && p2Lat && p2Lon) {
         LAP_LINE_P1 = { lat: parseFloat(p1Lat), lon: parseFloat(p1Lon) };
         LAP_LINE_P2 = { lat: parseFloat(p2Lat), lon: parseFloat(p2Lon) };
@@ -229,19 +228,17 @@ function getSettings() {
         // 設定がある場合は通常色
         if (reloadBtn) {
             reloadBtn.style.backgroundColor = ""; 
+            reloadBtn.style.color = "";
             reloadBtn.textContent = "RELOAD";
         }
     } else {
-        // 設定が空（初期状態）の場合は警告のオレンジ色にする
-        console.warn("Storage empty: Using default settings.");
+        // 設定がない場合は警告のオレンジ色
         if (reloadBtn) {
-            reloadBtn.style.backgroundColor = "#FFA500"; // オレンジ
-            reloadBtn.style.color = "#000";             // 文字を黒にして目立たせる
+            reloadBtn.style.backgroundColor = "#FFA500"; 
+            reloadBtn.style.color = "#000";
             reloadBtn.textContent = "NO SETTING";
         }
     }
-    
-    // パルス設定の更新
     pulseCount = (storedPulse && parseInt(storedPulse) > 0) ? parseInt(storedPulse) : 1;
 }
 
@@ -289,7 +286,7 @@ function dmmToDec(dmm, dir) {
 }
 
 function parseNMEA(line) {
-    lastUsbDataTime = Date.now(); // データが届くたびに時刻更新
+    lastUsbDataTime = Date.now();
     const p = line.split(',');
     if (line.includes('RMC') && p[2] === 'A') { 
         document.getElementById('speed_val').textContent = Math.round(parseFloat(p[7]) * 1.852); 
@@ -317,8 +314,6 @@ async function startUsbGps() {
         device = await navigator.usb.requestDevice({ filters: [{ vendorId: NMEA_VENDOR_ID, productId: NMEA_PRODUCT_ID }] });
         await device.open(); if (device.configuration === null) await device.selectConfiguration(1);
         await device.claimInterface(INTERFACE_NUMBER);
-        document.getElementById('usbGpsBtn').textContent = "USB ACTIVE";
-        
         while (device) {
             const result = await device.transferIn(IN_ENDPOINT, 512);
             if (result.status === 'ok') {
@@ -326,10 +321,7 @@ async function startUsbGps() {
                 nmeaBuffer = lines.pop(); lines.forEach(parseNMEA);
             }
         }
-    } catch (e) { 
-        console.error(e); 
-        document.getElementById('usbGpsBtn').classList.remove('active');
-    }
+    } catch (e) { console.error(e); }
 }
 
 async function ble() {
@@ -353,28 +345,18 @@ async function ble() {
     } catch (e) { console.error(e); }
 }
 
-// --- 統合監視タイマー (1秒おき) ---
+// 通信監視タイマー
 setInterval(() => {
     const now = Date.now();
-    
-    // USB通信監視
     const usbBtn = document.getElementById('usbGpsBtn');
     if (usbBtn) {
-        if (now - lastUsbDataTime < 1500 && lastUsbDataTime !== 0) {
-            usbBtn.classList.add('active');
-        } else {
-            usbBtn.classList.remove('active');
-        }
+        if (now - lastUsbDataTime < 1500 && lastUsbDataTime !== 0) usbBtn.classList.add('active');
+        else usbBtn.classList.remove('active');
     }
-
-    // BLE通信監視
     const bleBtn = document.getElementById('btConnect');
     if (bleBtn) {
-        if (now - lastBleDataTime < 1500 && lastBleDataTime !== 0) {
-            bleBtn.classList.add('active');
-        } else {
-            bleBtn.classList.remove('active');
-        }
+        if (now - lastBleDataTime < 1500 && lastBleDataTime !== 0) bleBtn.classList.add('active');
+        else bleBtn.classList.remove('active');
     }
 }, 1000);
 
@@ -409,15 +391,30 @@ function tick() {
     requestAnimationFrame(tick);
 }
 
-// --- 各ボタンのイベント設定 ---
+// --- ボタンイベントの紐付け ---
 document.getElementById('usbGpsBtn').onclick = startUsbGps;
 document.getElementById('btConnect').onclick = ble;
 
-// リロードボタン：一瞬凹ませてからリロード
+// RELOADボタン：設定を読み込み、成功時に青く光らせる
 document.getElementById('reloadBtn').onclick = () => {
     const btn = document.getElementById('reloadBtn');
-    btn.style.transform = "scale(0.95)";
-    setTimeout(() => { location.reload(); }, 150);
+    btn.style.transform = "scale(0.9)"; // 凹ませる
+    
+    getSettings(); // 設定読み込み実行
+
+    if (localStorage.getItem('startLineP1Lat')) {
+        // 設定がある場合：一瞬青く光る
+        btn.style.backgroundColor = "var(--hrc-blue)";
+        btn.textContent = "LOADED!";
+        setTimeout(() => {
+            btn.style.transform = "scale(1)";
+            btn.style.backgroundColor = ""; 
+            btn.textContent = "RELOAD";
+        }, 600);
+    } else {
+        // 設定がない場合：オレンジのまま戻す
+        setTimeout(() => { btn.style.transform = "scale(1)"; }, 150);
+    }
 };
 
 document.getElementById('startBtn').onclick = () => { 
@@ -431,28 +428,20 @@ document.getElementById('startBtn').onclick = () => {
 };
 
 document.getElementById('lapBtn').onclick = () => { 
-    if(swState===1){ 
-        processLap(Date.now()); 
-    } else { 
-        swState=0; lapRecords=[]; updateLapList(); 
-        document.getElementById('display1').textContent="00:00.000"; 
-    } 
+    if(swState===1){ processLap(Date.now()); } 
+    else { swState=0; lapRecords=[]; updateLapList(); document.getElementById('display1').textContent="00:00.000"; } 
 };
 
 window.onresize = () => { 
     canvas.width = canvas.parentElement.clientWidth; 
     canvas.height = canvas.parentElement.clientHeight; 
 };
-
-window.onload = () => { 
-    getSettings(); 
-    window.dispatchEvent(new Event('resize')); 
-    renderLoop(); 
-};
+window.onload = () => { getSettings(); window.dispatchEvent(new Event('resize')); renderLoop(); };
 </script>
 </body>
 
 </html>
+
 
 
 
