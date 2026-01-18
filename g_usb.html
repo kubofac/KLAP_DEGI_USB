@@ -201,26 +201,68 @@ function dmmToDec(dmm, dir) { const dot = dmm.indexOf('.'); const d = parseInt(d
 
 function parseNMEA(line) {
     const p = line.split(',');
+    // 速度情報の更新
     if (line.includes('RMC') && p[2] === 'A') { 
         lastUsbDataTime = Date.now(); 
         document.getElementById('speed_val').textContent = Math.round(parseFloat(p[7]) * 1.852); 
     }
+    
+    // 位置情報の更新とラップ判定
     if (line.includes('GGA') && p[6] !== '0') {
         lastUsbDataTime = Date.now();
         const currentPos = { lat: dmmToDec(p[2], p[3]), lon: dmmToDec(p[4], p[5]), time: Date.now() };
+
+        // TIMERが動いている(swState === 1) かつ スタートラインが設定されている場合
         if (lastPos && swState === 1 && LAP_LINE_P1.lat !== 0) {
             const dist = Math.sqrt(Math.pow(currentPos.lat - LAP_LINE_P1.lat, 2) + Math.pow(currentPos.lon - LAP_LINE_P1.lon, 2));
+            
+            // 設定した判定半径(gpsThresholdValue)以内にいるか
             if (dist * 111320 <= gpsThresholdValue) {
                 const cp1 = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (lastPos.lat - LAP_LINE_P1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (lastPos.lon - LAP_LINE_P1.lon);
                 const cp2 = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (currentPos.lat - LAP_LINE_P1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (currentPos.lon - LAP_LINE_P1.lon);
+                
+                // ラインをまたいだ瞬間を判定
                 if ((cp1 > 0 && cp2 < 0) || (cp1 < 0 && cp2 > 0)) {
+                    // 内挿計算で正確な通過時刻を算出
                     const exactTime = lastPos.time + (currentPos.time - lastPos.time) * (Math.abs(cp1) / (Math.abs(cp1) + Math.abs(cp2)));
-                    if (exactTime - lastLapTime > lapCoolDown) processLap(exactTime);
+                    
+                    // クールダウン時間を経過しているか確認
+                    if (exactTime - lastLapTime > lapCoolDown) {
+                        processLap(exactTime); 
+                    }
                 }
             }
         }
-        lastPos = currentPos;
+        lastPos = currentPos; // 前回の座標を更新
     }
+}
+
+function processLap(exactTime) {
+    // 1. ラップタイムの算出（前回のラップ開始時間からの差分）
+    const lapTime = exactTime - (lapStartTime || startTime); 
+    
+    // 2. 履歴への追加
+    lapRecords.unshift(lapTime); 
+    
+    // 3. 次のラップのための基準時間を更新
+    lapStartTime = exactTime; 
+    lastLapTime = exactTime; // 重複判定防止用
+    
+    // 4. 履歴表示の更新
+    const d = document.getElementById('lap'); 
+    d.innerHTML = ""; 
+    const best = Math.min(...lapRecords);
+    lapRecords.forEach((t, i) => {
+        const r = document.createElement('div'); 
+        r.className = `lap-row ${t === best ? 'best-lap' : ''}`;
+        r.innerHTML = `<span>L${lapRecords.length-i}</span><span>${timeFormat(t)}</span>`; 
+        d.appendChild(r);
+    });
+
+    // 5. 15秒フリーズのトリガー
+    isFrozen = true;
+    freezeDisplayTime = timeFormat(lapTime);
+    freezeStartTime = Date.now();
 }
 
 async function startUsbGps() {
@@ -250,25 +292,6 @@ async function ble() {
         await tC.startNotifications();
         tC.oncharacteristicvaluechanged = (e) => { lastBleDataTime = Date.now(); document.getElementById('temp_val').textContent = e.target.value.getUint8(0); };
     } catch (e) { console.error(e); bleWaiting = false; }
-}
-
-function processLap(exactTime) {
-    const lapTime = exactTime - (lapStartTime || startTime); 
-    lapRecords.unshift(lapTime); 
-    lapStartTime = exactTime; 
-    lastLapTime = exactTime;
-    
-    const d = document.getElementById('lap'); d.innerHTML = ""; 
-    const best = Math.min(...lapRecords);
-    lapRecords.forEach((t, i) => {
-        const r = document.createElement('div'); r.className = `lap-row ${t === best ? 'best-lap' : ''}`;
-        r.innerHTML = `<span>L${lapRecords.length-i}</span><span>${timeFormat(t)}</span>`; d.appendChild(r);
-    });
-
-    // 15秒フリーズ開始
-    isFrozen = true;
-    freezeDisplayTime = timeFormat(lapTime);
-    freezeStartTime = Date.now();
 }
 
 function timeFormat(ms) { 
@@ -312,3 +335,4 @@ window.onload = () => { window.dispatchEvent(new Event('resize')); updateSetting
 </script>
 </body>
 </html>
+
