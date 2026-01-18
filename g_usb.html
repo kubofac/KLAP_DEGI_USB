@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KLAP_DEGI_USB - Professional Edition</title>
+    <title>KLAP_DEGI_USB - Pro Edition</title>
     <style>
         :root { 
             --hrc-red: #E4002B; 
@@ -50,20 +50,26 @@
         .right-panels { display: flex; flex-direction: row; gap: 10px; height: 100%; align-items: flex-start; }
         
         #lap-panel { 
-            width: 170px; 
+            width: 175px; 
             height: 100%; 
             display: flex; 
             flex-direction: column; 
             overflow: hidden; 
-            border-top: 2px solid #000; /* 敷居線を黒に設定 */
+            border-top: 2px solid #000; 
         }
 
         #lap { flex: 1; overflow-y: auto; scrollbar-width: none; }
         #lap::-webkit-scrollbar { display: none; }
+        
         .lap-row { 
-            display: flex; justify-content: space-between; padding: 4px 0; 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 6px 0; 
             border-bottom: 1px solid rgba(255,255,255,0.1); 
-            font-family: 'Courier New', monospace; font-size: 18px; 
+            font-family: 'Arial Black', sans-serif; 
+            font-size: 18px; 
+            font-weight: 900; 
+            letter-spacing: -0.5px;
         }
         .best-lap { color: var(--hrc-red); font-weight: 900; }
 
@@ -120,7 +126,6 @@ let swState = 0, startTime = 0, lapStartTime = 0, lapRecords = [];
 let lastUsbDataTime = 0, lastBleDataTime = 0;
 let usbWaiting = false, bleWaiting = false;
 
-// フリーズ機能用
 let isFrozen = false;
 let freezeDisplayTime = "";
 let freezeStartTime = 0;
@@ -200,7 +205,7 @@ function parseNMEA(line) {
                 if ((cp1 > 0 && cp2 < 0) || (cp1 < 0 && cp2 > 0)) {
                     const exactTime = lastPos.time + (currentPos.time - lastPos.time) * (Math.abs(cp1) / (Math.abs(cp1) + Math.abs(cp2)));
                     if (exactTime - lastLapTime > lapCoolDown) {
-                        processLap(exactTime, true); // GPS自動ラップはフリーズあり
+                        processLap(exactTime, true); 
                     }
                 }
             }
@@ -256,7 +261,7 @@ function processLap(exactTime, useFreeze) {
         freezeDisplayTime = timeFormat(lapTime);
         freezeStartTime = Date.now();
     } else {
-        isFrozen = false; // 手動ボタン時はフリーズさせない
+        isFrozen = false;
     }
 }
 
@@ -302,7 +307,7 @@ document.getElementById('startBtn').onclick = () => {
 };
 document.getElementById('lapBtn').onclick = () => { 
     if(swState === 1) {
-        processLap(Date.now(), false); // 手動ラップボタンはフリーズなし
+        processLap(Date.now(), false);
     } else { 
         swState = 0; lapRecords = []; isFrozen = false; 
         document.getElementById('lap').innerHTML = ""; 
