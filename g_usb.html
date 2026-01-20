@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KLAP_DEGI_USB - Pro Edition</title>
+    <title>KLAP_DEGI_USB - High Speed Edition</title>
     <style>
         :root { 
             --hrc-red: #E4002B; 
@@ -121,7 +121,7 @@ const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", PULSE_UUID = "f4deb
 
 let currentRPM = 0, device = null, nmeaBuffer = '', lastPos = null, lastLapTime = 0;
 let LAP_LINE_P1 = { lat: 0, lon: 0 }, LAP_LINE_P2 = { lat: 0, lon: 0 };
-let gpsThresholdValue = 20, lapCoolDown = 30000, pulseCount = 1;
+let gpsThresholdValue = 20, lapCoolDown = 15000, pulseCount = 1;
 let swState = 0, startTime = 0, lapStartTime = 0, lapRecords = [];
 let lastUsbDataTime = 0, lastBleDataTime = 0;
 let usbWaiting = false, bleWaiting = false;
@@ -129,8 +129,44 @@ let usbWaiting = false, bleWaiting = false;
 let isFrozen = false;
 let freezeDisplayTime = "";
 let freezeStartTime = 0;
+let previousSideOfLine = null;
 
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+
+// --- アップロードされたコードから移植されたヘルパー関数 ---
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3;
+    const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180, Δλ = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function calculatePerpendicularFootApprox(lineLat1, lineLon1, lineLat2, lineLon2, pointLat, pointLon) {
+    const dx = lineLon2 - lineLon1, dy = lineLat2 - lineLat1;
+    const lineLenSq = dx * dx + dy * dy;
+    if (lineLenSq < 1e-9) return { lat: lineLat1, lon: lineLon1 };
+    const t = ((pointLon - lineLon1) * dx + (pointLat - lineLat1) * dy) / lineLenSq;
+    if (t < 0) return { lat: lineLat1, lon: lineLon1 };
+    if (t > 1) return { lat: lineLat2, lon: lineLon2 };
+    return { lat: lineLat1 + t * dy, lon: lineLon1 + t * dx };
+}
+
+function getSideOfLine(pointLat, pointLon, lineLat1, lineLon1, lineLat2, lineLon2) {
+    return (lineLon2 - lineLon1) * (pointLat - lineLat1) - (lineLat2 - lineLat1) * (pointLon - lineLon1);
+}
+
+function getIntersectionTime(p1, p2) {
+    const den = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (p2.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (p2.lon - p1.lon);
+    if (Math.abs(den) < 1e-12) return null;
+    const t_num = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (LAP_LINE_P1.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (LAP_LINE_P1.lon - p1.lon);
+    const t_ratio = t_num / den;
+    if (t_ratio < 0 || t_ratio > 1) return null;
+    return p1.time + (p2.time - p1.time) * t_ratio;
+}
+
+// --- メイン処理 ---
 
 function updateSettings() {
     const btn = document.getElementById('reloadBtn');
@@ -140,7 +176,9 @@ function updateSettings() {
     if (p1Lat && p1Lon) {
         LAP_LINE_P1 = { lat: parseFloat(p1Lat), lon: parseFloat(p1Lon) };
         LAP_LINE_P2 = { lat: parseFloat(p2Lat), lon: parseFloat(p2Lon) };
-        pulseCount = parseInt(storedPulse) || 1; gpsThresholdValue = parseFloat(storedThreshold) || 20; lapCoolDown = parseFloat(storedCoolDown) || 30000;
+        pulseCount = parseInt(storedPulse) || 1; 
+        gpsThresholdValue = parseFloat(storedThreshold) || 20; 
+        lapCoolDown = parseFloat(storedCoolDown) || 15000;
         btn.style.backgroundColor = '#1a1a1a'; btn.textContent = "RELOAD"; return true;
     } else {
         btn.style.backgroundColor = '#FFA500'; btn.textContent = "NO SETTING"; return false;
@@ -196,19 +234,27 @@ function parseNMEA(line) {
         lastUsbDataTime = Date.now();
         const currentPos = { lat: dmmToDec(p[2], p[3]), lon: dmmToDec(p[4], p[5]), time: Date.now() };
 
-        if (lastPos && swState === 1 && LAP_LINE_P1.lat !== 0) {
-            const dist = Math.sqrt(Math.pow(currentPos.lat - LAP_LINE_P1.lat, 2) + Math.pow(currentPos.lon - LAP_LINE_P1.lon, 2));
-            if (dist * 111320 <= gpsThresholdValue) {
-                const cp1 = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (lastPos.lat - LAP_LINE_P1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (lastPos.lon - LAP_LINE_P1.lon);
-                const cp2 = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (currentPos.lat - LAP_LINE_P1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (currentPos.lon - LAP_LINE_P1.lon);
+        if (swState === 1 && LAP_LINE_P1.lat !== 0) {
+            const currentSide = getSideOfLine(currentPos.lat, currentPos.lon, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
+            
+            if (lastPos && previousSideOfLine !== null) {
+                const isCrossing = (previousSideOfLine > 0 && currentSide < 0) || (previousSideOfLine < 0 && currentSide > 0);
+                const timeSinceLastLap = currentPos.time - lastLapTime;
                 
-                if ((cp1 > 0 && cp2 < 0) || (cp1 < 0 && cp2 > 0)) {
-                    const exactTime = lastPos.time + (currentPos.time - lastPos.time) * (Math.abs(cp1) / (Math.abs(cp1) + Math.abs(cp2)));
-                    if (exactTime - lastLapTime > lapCoolDown) {
-                        processLap(exactTime, true); 
+                if (isCrossing && timeSinceLastLap >= lapCoolDown) {
+                    // 近接判定（スタートラインの線分から閾値以内か）
+                    const foot = calculatePerpendicularFootApprox(LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon, currentPos.lat, currentPos.lon);
+                    const dist = calculateDistance(currentPos.lat, currentPos.lon, foot.lat, foot.lon);
+
+                    if (dist <= gpsThresholdValue) {
+                        const exactTime = getIntersectionTime(lastPos, currentPos);
+                        if (exactTime) {
+                            processLap(exactTime, true);
+                        }
                     }
                 }
             }
+            previousSideOfLine = currentSide;
         }
         lastPos = currentPos;
     }
@@ -309,7 +355,7 @@ document.getElementById('lapBtn').onclick = () => {
     if(swState === 1) {
         processLap(Date.now(), false);
     } else { 
-        swState = 0; lapRecords = []; isFrozen = false; 
+        swState = 0; lapRecords = []; isFrozen = false; lastLapTime = 0; previousSideOfLine = null;
         document.getElementById('lap').innerHTML = ""; 
         document.getElementById('display1').textContent = "00:00.000"; 
         document.getElementById('display').textContent = "TOTAL 00:00.000";
@@ -322,3 +368,4 @@ window.onload = () => { window.dispatchEvent(new Event('resize')); updateSetting
 </script>
 </body>
 </html>
+
