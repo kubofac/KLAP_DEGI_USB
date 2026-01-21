@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KLAP FULL - DEBUG INTEGRATED</title>
+    <title>KLAP DEGI - FULL DEBUG</title>
     <style>
         :root { 
             --hrc-red: #E4002B; --hrc-blue: #004098; --hrc-white: #ffffff; 
@@ -19,68 +19,64 @@
         #dashboard { position: relative; display: flex; flex-direction: column; height: 100dvh; width: 100vw; }
         #canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: calc(100% - 50px) !important; z-index: 1; }
         
-        /* メインUIレイヤー */
-        .main-ui-container {
-            position: absolute; right: 5px; top: 130px; bottom: 15px;
-            display: flex; align-items: flex-start; gap: 55px; z-index: 20; 
-        }
-        #info-overlay { display: flex; flex-direction: column; align-items: flex-end; text-align: right; gap: 15px; }
-        #rpm_val { font-size: 13vh; font-weight: 900; line-height: 0.9; margin-top: 10px; text-shadow: 3px 3px 12px #000; }
-        #display1 { font-size: 18vh; font-weight: 900; line-height: 0.9; color: var(--hrc-white); text-shadow: 4px 4px 15px #000; }
-        #display { font-size: 4.5vh; color: #bbb; text-shadow: 1px 1px 6px #000; }
-
-        /* デバッグパネル（中央に重なるように配置） */
+        /* --- デバッグ表示用パネル (検証完了後に削除可能) --- */
         #debug-panel {
-            position: absolute; top: 15%; left: 5%; width: 50%;
+            position: fixed; top: 10px; left: 10px; width: 240px;
             background: rgba(0, 0, 0, 0.85); color: #00FF00;
-            font-family: monospace; font-size: 11px; padding: 10px;
-            border: 2px solid #444; z-index: 9999; pointer-events: none;
-            display: grid; grid-template-columns: 1fr; gap: 2px;
+            font-family: monospace; font-size: 10px; padding: 8px;
+            border: 1px solid #444; z-index: 9999; pointer-events: none;
+            line-height: 1.3;
         }
         .db-line { display: flex; justify-content: space-between; border-bottom: 1px solid #222; }
-        .status-msg { color: #FFFF00; font-weight: bold; font-size: 14px; margin-top: 5px; text-align: center; border-top: 1px solid #555; }
+        .status-msg { color: #FFFF00; font-weight: bold; border-top: 1px solid #555; margin-top: 5px; padding-top: 5px; text-align: center; }
+
+        /* --- メインUIレイヤー --- */
+        .main-ui-container {
+            position: absolute; right: 5px; top: 120px; bottom: 15px;
+            display: flex; align-items: flex-start; gap: 40px; z-index: 20; 
+        }
+        #info-overlay { display: flex; flex-direction: column; align-items: flex-end; text-align: right; gap: 15px; }
+        #rpm_val { font-size: 12vh; font-weight: 900; line-height: 0.9; text-shadow: 3px 3px 12px #000; }
+        #display1 { font-size: 16vh; font-weight: 900; line-height: 0.9; color: var(--hrc-white); text-shadow: 4px 4px 15px #000; }
+        #display { font-size: 4vh; color: #bbb; text-shadow: 1px 1px 6px #000; }
 
         .right-panels { display: flex; flex-direction: row; gap: 10px; height: 100%; align-items: flex-start; }
-        #lap-panel { width: 175px; height: 100%; display: flex; flex-direction: column; overflow: hidden; border-top: 2px solid #000; }
+        #lap-panel { width: 160px; height: 100%; display: flex; flex-direction: column; overflow: hidden; border-top: 2px solid #000; }
         #lap { flex: 1; overflow-y: auto; scrollbar-width: none; }
-        .lap-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 18px; font-weight: 900; }
-        .best-lap { color: var(--hrc-red); }
+        .lap-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 16px; font-weight: 900; }
 
         footer { height: 50px; display: flex; gap: 4px; padding: 4px; background: #000; border-top: 1px solid #333; z-index: 100; position: relative; }
         button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; }
-        button.waiting { background: var(--hrc-orange) !important; color: #000 !important; }
         button.active { background: var(--hrc-red) !important; color: #fff !important; }
     </style>
 </head>
 <body>
 
+<div id="debug-panel">
+    <div class="db-line"><span>RMC_POS:</span><span id="d-rmc">---</span></div>
+    <div class="db-line"><span>GGA_POS:</span><span id="d-gga">---</span></div>
+    <div class="db-line"><span>RATE (R/G):</span><span id="d-rate">0/0 Hz</span></div>
+    <div class="db-line"><span>DIST TO L:</span><span id="d-dist">--- m</span></div>
+    <div class="db-line"><span>SIDE/PREV:</span><span id="d-side">---</span></div>
+    <div class="db-line"><span>COOLDOWN:</span><span id="d-cool">--- s</span></div>
+    <div class="db-line"><span>SW_STATE:</span><span id="d-sw">0</span></div>
+    <div id="d-msg" class="status-msg">WAITING FOR GPS...</div>
+</div>
+
 <div id="dashboard">
     <canvas id="canvas"></canvas>
-
-    <div id="debug-panel">
-        <div class="db-line"><span>RMC LAT/LON:</span><span id="d-rmc">---</span></div>
-        <div class="db-line"><span>GGA LAT/LON:</span><span id="d-gga">---</span></div>
-        <div class="db-line"><span>GPS RATE (R/G):</span><span id="d-rate">0/0 Hz</span></div>
-        <div class="db-line"><span>DIST TO LINE:</span><span id="d-dist">--- m</span></div>
-        <div class="db-line"><span>SIDE / PREV:</span><span id="d-side">---</span></div>
-        <div class="db-line"><span>COOL DOWN:</span><span id="d-cool">--- s</span></div>
-        <div class="db-line"><span>SW STATE:</span><span id="d-sw">0 (READY)</span></div>
-        <div id="d-msg" class="status-msg">WAITING FOR USB/BLE...</div>
-    </div>
-
-    <div class="top-section">
-        <div class="main-ui-container">
-            <div id="info-overlay">
-                <div id="rpm_val">0</div>
-                <div id="display1">00:00.000</div>
-                <div id="display">TOTAL 00:00.000</div>
-            </div>
-            <div class="right-panels">
-                <div id="lap-panel"><div id="lap"></div></div>
-                <div class="data-panel" style="width:125px; display:flex; flex-direction:column; gap:15px;">
-                    <div class="data-box" style="text-align:right;"><div style="font-size:11px; color:var(--hrc-red);">SPEED</div><div class="val" id="speed_val" style="font-size:44px; font-weight:900;">0</div></div>
-                    <div class="data-box" style="text-align:right;"><div style="font-size:11px; color:var(--hrc-red);">TEMP</div><div class="val" id="temp_val" style="font-size:44px; font-weight:900;">--</div></div>
-                </div>
+    
+    <div class="main-ui-container">
+        <div id="info-overlay">
+            <div id="rpm_val">0</div>
+            <div id="display1">00:00.000</div>
+            <div id="display">TOTAL 00:00.000</div>
+        </div>
+        <div class="right-panels">
+            <div id="lap-panel"><div id="lap"></div></div>
+            <div style="width:100px; display:flex; flex-direction:column; gap:10px; text-align:right;">
+                <div><small style="color:var(--hrc-red);">SPEED</small><div id="speed_val" style="font-size:36px; font-weight:900;">0</div></div>
+                <div><small style="color:var(--hrc-red);">TEMP</small><div id="temp_val" style="font-size:36px; font-weight:900;">--</div></div>
             </div>
         </div>
     </div>
@@ -103,25 +99,12 @@ let currentRPM = 0, device = null, nmeaBuffer = '', lastPos = null, lastLapTime 
 let LAP_LINE_P1 = { lat: 0, lon: 0 }, LAP_LINE_P2 = { lat: 0, lon: 0 };
 let gpsThresholdValue = 20, lapCoolDown = 15000, pulseCount = 1;
 let swState = 0, startTime = 0, lapStartTime = 0, lapRecords = [];
-let lastUsbDataTime = 0, lastBleDataTime = 0, isFrozen = false, freezeDisplayTime = "", freezeStartTime = 0, previousSideOfLine = null;
-let rmcCount = 0, ggaCount = 0, lastRateCheck = Date.now();
+let lastUsbDataTime = 0, lastBleDataTime = 0, rmcCount = 0, ggaCount = 0, lastRateCheck = Date.now();
+let isFrozen = false, freezeDisplayTime = "", freezeStartTime = 0, previousSideOfLine = null;
 
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 
-// --- デバッグ表示更新タイマー ---
-setInterval(() => {
-    const now = Date.now(), dt = (now - lastRateCheck) / 1000;
-    document.getElementById('d-rate').textContent = Math.round(rmcCount/dt) + "/" + Math.round(ggaCount/dt) + " Hz";
-    document.getElementById('d-cool').textContent = lastLapTime === 0 ? "OK" : ((now - lastLapTime)/1000).toFixed(1);
-    rmcCount = 0; ggaCount = 0; lastRateCheck = now;
-    
-    // 接続ボタンの色同期
-    const uBtn = document.getElementById('usbGpsBtn'), bBtn = document.getElementById('btConnect');
-    uBtn.className = (now - lastUsbDataTime < 1500 && lastUsbDataTime !== 0) ? 'active' : '';
-    bBtn.className = (now - lastBleDataTime < 1500 && lastBleDataTime !== 0) ? 'active' : '';
-}, 1000);
-
-// --- 移植された計測ロジック ---
+// --- 移植されたコアロジック (klap-usb.htmlと同一) ---
 function getSideOfLine(p, p1, p2) { return (p2.lon - p1.lon) * (p.lat - p1.lat) - (p2.lat - p1.lat) * (p.lon - p1.lon); }
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
@@ -154,24 +137,25 @@ function parseNMEA(line) {
         const lat = dmmToDec(p[3], p[4]), lon = dmmToDec(p[5], p[6]);
         lastUsbDataTime = Date.now(); rmcCount++;
         document.getElementById('speed_val').textContent = Math.round(parseFloat(p[7]) * 1.852);
-        document.getElementById('d-rmc').textContent = lat.toFixed(4) + "," + lon.toFixed(4);
+        document.getElementById('d-rmc').textContent = lat.toFixed(5) + "," + lon.toFixed(5);
     }
     if (line.includes('GGA') && p[6] !== '0') {
         const cur = { lat: dmmToDec(p[2], p[3]), lon: dmmToDec(p[4], p[5]), time: Date.now() };
         lastUsbDataTime = Date.now(); ggaCount++;
-        document.getElementById('d-gga').textContent = cur.lat.toFixed(4) + "," + cur.lon.toFixed(4);
+        document.getElementById('d-gga').textContent = cur.lat.toFixed(5) + "," + cur.lon.toFixed(5);
 
         if (LAP_LINE_P1.lat !== 0) {
             const side = getSideOfLine(cur, LAP_LINE_P1, LAP_LINE_P2);
             const foot = getPerpendicularFoot(cur, LAP_LINE_P1, LAP_LINE_P2);
             const dist = calculateDistance(cur.lat, cur.lon, foot.lat, foot.lon);
-            document.getElementById('d-dist').textContent = dist.toFixed(1) + " m";
-            document.getElementById('d-side').textContent = side.toFixed(5) + " / " + (previousSideOfLine?previousSideOfLine.toFixed(5):"N");
+            document.getElementById('d-dist').textContent = dist.toFixed(1) + "m";
+            document.getElementById('d-side').textContent = side.toFixed(5) + " / " + (previousSideOfLine ? previousSideOfLine.toFixed(5) : "N");
 
             if (swState === 1 && lastPos && previousSideOfLine !== null) {
                 const crossed = (previousSideOfLine > 0 && side < 0) || (previousSideOfLine < 0 && side > 0);
                 if (crossed) {
-                    if (dist <= gpsThresholdValue && (cur.time - lastLapTime) > lapCoolDown) {
+                    const elapsed = cur.time - lastLapTime;
+                    if (dist <= gpsThresholdValue && elapsed > lapCoolDown) {
                         const exactTime = getIntersectionTime(lastPos, cur, LAP_LINE_P1, LAP_LINE_P2);
                         processLap(exactTime, true);
                         document.getElementById('d-msg').textContent = "LAP DETECTED!";
@@ -186,25 +170,33 @@ function parseNMEA(line) {
     }
 }
 
-// --- UI & BLE/USB 接続ロジック ---
+// --- システム・UI制御 ---
 function updateSettings() {
     const p1Lat = localStorage.getItem('startLineP1Lat'), p1Lon = localStorage.getItem('startLineP1Lon');
     const p2Lat = localStorage.getItem('startLineP2Lat'), p2Lon = localStorage.getItem('startLineP2Lon');
     gpsThresholdValue = parseFloat(localStorage.getItem('gpsThreshold')) || 20;
     lapCoolDown = parseFloat(localStorage.getItem('lapCoolDownTime')) || 15000;
     pulseCount = parseInt(localStorage.getItem('pl1')) || 1;
-    if (p1Lat && p1Lon) {
+    if (p1Lat) {
         LAP_LINE_P1 = { lat: parseFloat(p1Lat), lon: parseFloat(p1Lon) };
         LAP_LINE_P2 = { lat: parseFloat(p2Lat), lon: parseFloat(p2Lon) };
-        document.getElementById('d-msg').textContent = "READY: LINE LOADED";
+        document.getElementById('d-msg').textContent = "LINE LOADED";
     }
 }
+
+setInterval(() => {
+    const now = Date.now(), dt = (now - lastRateCheck)/1000;
+    document.getElementById('d-rate').textContent = Math.round(rmcCount/dt) + "/" + Math.round(ggaCount/dt) + " Hz";
+    document.getElementById('d-cool').textContent = lastLapTime === 0 ? "OK" : ((now-lastLapTime)/1000).toFixed(1);
+    rmcCount = 0; ggaCount = 0; lastRateCheck = now;
+}, 1000);
 
 async function startUsbGps() {
     try {
         device = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x1546, productId: 0x01A8 }] });
         await device.open(); if (device.configuration === null) await device.selectConfiguration(1);
         await device.claimInterface(1);
+        document.getElementById('usbGpsBtn').classList.add('active');
         while (device) {
             const result = await device.transferIn(2, 512);
             const lines = (nmeaBuffer + new TextDecoder().decode(result.data)).split(/\r?\n/);
@@ -222,15 +214,16 @@ async function ble() {
         pC.oncharacteristicvaluechanged = (e) => { lastBleDataTime = Date.now(); currentRPM = (e.target.value.getUint16(0, true) * 60) / pulseCount; };
         await tC.startNotifications();
         tC.oncharacteristicvaluechanged = (e) => { lastBleDataTime = Date.now(); document.getElementById('temp_val').textContent = e.target.value.getUint8(0); };
+        document.getElementById('btConnect').classList.add('active');
     } catch (e) { document.getElementById('d-msg').textContent = "BLE ERR"; }
 }
 
 function processLap(exactTime, useFreeze) {
     const lapTime = exactTime - (lapStartTime || startTime);
     lapRecords.unshift(lapTime); lapStartTime = exactTime; lastLapTime = exactTime;
-    const d = document.getElementById('lap'); d.innerHTML = ""; const best = Math.min(...lapRecords);
+    const d = document.getElementById('lap'); d.innerHTML = "";
     lapRecords.forEach((t, i) => {
-        const r = document.createElement('div'); r.className = `lap-row ${t === best ? 'best-lap' : ''}`;
+        const r = document.createElement('div'); r.className = `lap-row ${t === Math.min(...lapRecords) ? 'best-lap' : ''}`;
         r.innerHTML = `<span>L${lapRecords.length-i}</span><span>${timeFormat(t)}</span>`; d.appendChild(r);
     });
     if (useFreeze) { isFrozen = true; freezeDisplayTime = timeFormat(lapTime); freezeStartTime = Date.now(); }
@@ -282,10 +275,10 @@ function drawTacho(rpm) {
 document.getElementById('usbGpsBtn').onclick = startUsbGps;
 document.getElementById('btConnect').onclick = ble;
 document.getElementById('startBtn').onclick = () => { 
-    swState = swState === 1 ? 2 : 1;
-    if(swState === 1) { startTime = Date.now(); lapStartTime = startTime; tick(); }
-    document.getElementById('startBtn').classList.toggle('active');
-    document.getElementById('d-sw').textContent = swState === 1 ? "1 (RUNNING)" : "2 (STOP)";
+    swState = swState === 1 ? 2 : 1; 
+    if(swState === 1) { startTime = Date.now(); lapStartTime = startTime; tick(); document.getElementById('startBtn').classList.add('active'); }
+    else { document.getElementById('startBtn').classList.remove('active'); }
+    document.getElementById('d-sw').textContent = swState;
 };
 document.getElementById('lapBtn').onclick = () => { 
     if(swState === 1) processLap(Date.now(), false);
