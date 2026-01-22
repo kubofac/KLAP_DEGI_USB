@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KLAP_DEGI_USB - Ultimate Edition</title>
+    <title>KLAP_DEGI_USB - Ultimate Edition (Demo Ready)</title>
     <style>
         :root { 
             --hrc-red: #E4002B; 
@@ -57,6 +57,10 @@
         button { flex: 1; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; }
         button.waiting { background: var(--hrc-orange) !important; color: #000 !important; }
         button.active { background: var(--hrc-red) !important; color: #fff !important; }
+        
+        /* デモモード用アニメーション */
+        button.demo-active { animation: demoBlink 1s infinite; background: var(--hrc-red) !important; }
+        @keyframes demoBlink { 0% {opacity: 1;} 50% {opacity: 0.6;} 100% {opacity: 1;} }
     </style>
 </head>
 <body>
@@ -101,9 +105,12 @@ let usbWaiting = false, bleWaiting = false;
 let isFrozen = false, freezeDisplayTime = "", freezeStartTime = 0;
 let previousSideOfLine = null, isGpsFixed = false;
 
+// --- デモモード用変数 ---
+let isDemoMode = false, demoClickCount = 0, demoInterval = null;
+
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 
-// --- ヘルパー関数 (高精度計算用) ---
+// --- ヘルパー関数 ---
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const f1 = lat1 * Math.PI / 180, f2 = lat2 * Math.PI / 180;
@@ -111,7 +118,6 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     const a = Math.sin(df/2)**2 + Math.cos(f1) * Math.cos(f2) * Math.sin(dl/2)**2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-
 function calculatePerpendicularFootApprox(l1, l2, p) {
     const dx = l2.lon - l1.lon, dy = l2.lat - l1.lat;
     const lenSq = dx*dx + dy*dy;
@@ -120,11 +126,9 @@ function calculatePerpendicularFootApprox(l1, l2, p) {
     const ct = Math.max(0, Math.min(1, t));
     return { lat: l1.lat + ct * dy, lon: l1.lon + ct * dx };
 }
-
 function getSideOfLine(pLat, pLon, l1Lat, l1Lon, l2Lat, l2Lon) {
     return (l2Lon - l1Lon) * (pLat - l1Lat) - (l2Lat - l1Lat) * (pLon - l1Lon);
 }
-
 function getIntersectionTime(p1, p2) {
     const den = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (p2.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (p2.lon - p1.lon);
     if (Math.abs(den) < 1e-12) return null;
@@ -132,7 +136,6 @@ function getIntersectionTime(p1, p2) {
     const t_ratio = t_num / den;
     return (t_ratio >= 0 && t_ratio <= 1) ? p1.time + (p2.time - p1.time) * t_ratio : null;
 }
-
 function dmmToDec(dmm, dir) { 
     const dot = dmm.indexOf('.'); 
     const d = parseInt(dmm.substring(0, dot-2)), m = parseFloat(dmm.substring(dot-2)); 
@@ -140,22 +143,56 @@ function dmmToDec(dmm, dir) {
     return (dir === 'S' || dir === 'W') ? -dec : dec; 
 }
 
-// --- メイン処理 ---
+// --- デモモード制御 ---
+function toggleDemoMode() {
+    isDemoMode = !isDemoMode;
+    const btn = document.getElementById('reloadBtn');
+    if (isDemoMode) {
+        btn.textContent = "DEMO ACTIVE";
+        btn.classList.add('demo-active');
+        demoInterval = setInterval(updateDemoData, 100);
+    } else {
+        location.reload(); // デモ終了時はクリーンにリロード
+    }
+}
+
+function updateDemoData() {
+    const now = Date.now();
+    // 仮想データの流し込み
+    currentRPM = 7000 + Math.sin(now / 400) * 4000 + Math.random() * 300;
+    document.getElementById('speed_val').textContent = Math.floor(140 + Math.sin(now / 2000) * 30);
+    document.getElementById('temp_val').textContent = Math.floor(88 + Math.sin(now / 5000) * 3);
+    
+    // 通信ランプを光らせる
+    lastUsbDataTime = now;
+    lastBleDataTime = now;
+    isGpsFixed = true;
+
+    // タイマー稼働中なら60秒ごとにラップを刻むシミュレーション
+    if (swState === 1 && now - lastLapTime > 60000) {
+        processLap(now, true);
+    }
+}
+
+// --- メインロジック ---
 function updateSettings() {
     const btn = document.getElementById('reloadBtn');
+    if (isDemoMode) return true; // デモ中は無視
     const p1Lat = localStorage.getItem('startLineP1Lat'), p1Lon = localStorage.getItem('startLineP1Lon');
     const p2Lat = localStorage.getItem('startLineP2Lat'), p2Lon = localStorage.getItem('startLineP2Lon');
-    const sP = localStorage.getItem('pl1'), sT = localStorage.getItem('gpsThreshold'), sC = localStorage.getItem('lapCoolDownTime');
     if (p1Lat && p1Lon) {
         LAP_LINE_P1 = { lat: parseFloat(p1Lat), lon: parseFloat(p1Lon) };
         LAP_LINE_P2 = { lat: parseFloat(p2Lat), lon: parseFloat(p2Lon) };
-        pulseCount = parseInt(sP) || 1; gpsThresholdValue = parseFloat(sT) || 20; lapCoolDown = parseFloat(sC) || 15000;
+        pulseCount = parseInt(localStorage.getItem('pl1')) || 1; 
+        gpsThresholdValue = parseFloat(localStorage.getItem('gpsThreshold')) || 20; 
+        lapCoolDown = parseFloat(localStorage.getItem('lapCoolDownTime')) || 15000;
         btn.style.backgroundColor = '#1a1a1a'; btn.textContent = "RELOAD"; return true;
     }
     btn.style.backgroundColor = '#FFA500'; btn.textContent = "NO SETTING"; return false;
 }
 
 function parseNMEA(line) {
+    if (isDemoMode) return; // デモ中は実データを無視
     const p = line.split(',');
     if (line.includes('RMC')) {
         lastUsbDataTime = Date.now();
@@ -250,7 +287,6 @@ setInterval(() => {
     else if (bleWaiting) bBtn.className = 'waiting'; else bBtn.className = '';
 }, 1000);
 
-// --- タコメーター描画 ---
 function drawTacho(rpm) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const w = canvas.width, h = canvas.height, segments = 75, active = Math.floor((rpm / 14000) * segments);
@@ -271,6 +307,7 @@ function drawTacho(rpm) {
     document.getElementById('rpm_val').textContent = Math.floor(rpm);
 }
 
+// --- イベントリスナー ---
 document.getElementById('usbGpsBtn').onclick = startUsbGps;
 document.getElementById('btConnect').onclick = ble;
 document.getElementById('startBtn').onclick = () => { 
@@ -283,7 +320,21 @@ document.getElementById('lapBtn').onclick = () => {
         document.getElementById('lap').innerHTML = ""; document.getElementById('display1').textContent = "00:00.000"; document.getElementById('display').textContent = "TOTAL 00:00.000";
     } 
 };
-document.getElementById('reloadBtn').onclick = () => { if(updateSettings()) { document.getElementById('reloadBtn').style.backgroundColor = '#004098'; setTimeout(updateSettings, 800); } };
+
+// RELOADボタンに隠し機能を統合
+document.getElementById('reloadBtn').onclick = () => {
+    demoClickCount++;
+    if (demoClickCount >= 5) {
+        toggleDemoMode();
+        demoClickCount = 0;
+    } else {
+        if(updateSettings()) { 
+            document.getElementById('reloadBtn').style.backgroundColor = '#004098'; 
+            setTimeout(updateSettings, 800); 
+        }
+    }
+};
+
 window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight - 60; };
 window.onload = () => { window.dispatchEvent(new Event('resize')); updateSettings(); (function renderLoop() { drawTacho(currentRPM); requestAnimationFrame(renderLoop); })(); };
 </script>
