@@ -222,18 +222,34 @@ function parseNMEA(line) {
 
 async function startUsbGps() {
     try {
-        device = await navigator.usb.requestDevice({ filters: [{ vendorId: NMEA_VENDOR_ID, productId: NMEA_PRODUCT_ID }] });
+        // 設定画面で保存された値を読み出す（なければデフォルト1と2）
+        const savedInterface = parseInt(localStorage.getItem('usb_interface')) || 1;
+        const savedEndpoint = parseInt(localStorage.getItem('usb_endpoint')) || 2;
+        
+        // 特定のIDが保存されていればそれを使う、なければ全表示
+        const vId = localStorage.getItem('usb_vendor_id');
+        const filters = vId ? [{ vendorId: parseInt(vId) }] : [];
+
+        device = await navigator.usb.requestDevice({ filters: filters });
         await device.open();
         usbWaiting = true;
+        
         if (device.configuration === null) await device.selectConfiguration(1);
-        await device.claimInterface(1);
+        
+        // ストレージに保存されていたインターフェースを使用
+        await device.claimInterface(savedInterface); 
+        
         while (device) {
-            const result = await device.transferIn(2, 512);
+            // ストレージに保存されていたエンドポイントを使用
+            const result = await device.transferIn(savedEndpoint, 512); 
             const lines = (nmeaBuffer + new TextDecoder().decode(result.data)).split(/\r?\n/);
             nmeaBuffer = lines.pop();
             lines.forEach(parseNMEA);
         }
-    } catch (e) { console.error(e); usbWaiting = false; }
+    } catch (e) { 
+        console.error(e); 
+        usbWaiting = false; 
+    }
 }
 
 async function ble() {
@@ -340,3 +356,4 @@ window.onload = () => { window.dispatchEvent(new Event('resize')); updateSetting
 </script>
 </body>
 </html>
+
