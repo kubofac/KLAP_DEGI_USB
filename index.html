@@ -187,7 +187,11 @@ if ('serviceWorker' in navigator) {
     <div class="form-group">
         <p>GPS更新頻度: <span id="gps-frequency">計測中...</span> Hz</p>
     </div>
-
+<div class="control-group">
+    <label>USB GPS 接続テスト:</label>
+    <button id="usbTestBtn" style="padding: 10px; background: #444; color: white; border-radius: 5px;">USB GPS をスキャン</button>
+    <div id="usbStatus" style="font-size: 12px; margin-top: 5px; color: #aaa;">未接続</div>
+</div>
     <div class="form-group">
         <label for="pulseCountSelect">パルス数:</label>
         <select name="pl" id="pulseCountSelect">
@@ -470,7 +474,45 @@ if ('serviceWorker' in navigator) {
             localStorage.setItem('pl1', pl1);
             document.getElementById('instructionMessage').textContent = 'パルス数を保存しました: ' + pl1;
         }
+document.getElementById('usbTestBtn').addEventListener('click', async () => {
+    try {
+        const status = document.getElementById('usbStatus');
+        status.textContent = "スキャン中...";
+        
+        // デバイスを選択
+        const device = await navigator.usb.requestDevice({ filters: [] });
+        await device.open();
+        
+        if (device.configuration === null) await device.selectConfiguration(1);
 
+        // 以前の成功パターン（Interface: 1, Endpoint: 2）をデフォルトとして特定
+        // 多くのu-blox系はこの構成です
+        const targetInterface = 1;
+        const targetEndpoint = 2;
+
+        try {
+            await device.claimInterface(targetInterface);
+            
+            // 成功したらストレージに保存
+            localStorage.setItem('usb_interface', targetInterface);
+            localStorage.setItem('usb_endpoint', targetEndpoint);
+            localStorage.setItem('usb_vendor_id', device.vendorId);
+            localStorage.setItem('usb_product_id', device.productId);
+
+            status.textContent = `成功！保存完了 (IF:${targetInterface}, EP:${targetEndpoint})`;
+            status.style.color = "#00ff00";
+            
+            // 接続を閉じる
+            await device.close();
+        } catch (err) {
+            status.textContent = "インターフェースの取得に失敗しました。";
+            status.style.color = "#ff0000";
+        }
+    } catch (err) {
+        console.error(err);
+        document.getElementById('usbStatus').textContent = "接続がキャンセルされました。";
+    }
+});
         const thresholdSelect = document.getElementById("thresholdSelect");
         thresholdSelect.addEventListener("change", function (e) {
             gpsThreshold = Number(thresholdSelect.value);
@@ -699,5 +741,6 @@ button2.addEventListener('click', () => {
     </script>
 </body>
 </html>
+
 
 
