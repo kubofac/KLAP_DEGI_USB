@@ -2,64 +2,58 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPS設定ツール</title>
+    <title>GPS設定ツール Pro</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-    <link rel="manifest" href="/manifest.json">
     <style>
         #map-container { position: relative; }
-        #mapid { height: 300px; width: 100%; margin-bottom: 15px; }
-        #map-controls { position: absolute; top: 10px; right: 10px; z-index: 1000; background-color: rgba(255, 255, 255, 0.8); padding: 10px; border-radius: 5px; box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3); }
-        body { font-family: sans-serif; padding: 20px; background-color: #f0f0f0; }
-        .control-group { background-color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        label { display: block; margin-bottom: 8px; font-weight: bold; }
-        select, button { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
-        button { background-color: #444; color: white; cursor: pointer; border: none; transition: 0.3s; }
-        button:hover { background-color: #666; }
-        button:disabled { background-color: #ccc; cursor: not-allowed; }
-        .result-text { font-size: 14px; margin-top: 5px; font-weight: bold; color: #333; }
-        #instructionMessage { color: #d9534f; font-weight: bold; margin-bottom: 10px; }
+        #mapid { height: 400px; width: 100%; margin-bottom: 15px; border-radius: 8px; }
+        #map-controls { position: absolute; top: 10px; right: 10px; z-index: 1000; background: rgba(255,255,255,0.9); padding: 8px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        body { font-family: sans-serif; padding: 15px; background-color: #f0f0f0; margin: 0; }
+        .control-group { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
+        select, button { width: 100%; padding: 12px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; box-sizing: border-box; }
+        button { background-color: #444; color: white; border: none; font-weight: bold; }
+        button:active { background-color: #222; }
+        .result-text { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 5px; }
+        .nav-button { background-color: #007bff; font-size: 18px; padding: 15px; margin-top: 10px; }
+        #instructionMessage { color: #d9534f; font-weight: bold; font-size: 14px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
     <h1>GPS設定ツール</h1>
-    <p id="instructionMessage">地図をタップしてP1を設定するか、サーキットを選択してください。</p>
+    <p id="instructionMessage">現在地を取得中...</p>
 
     <div id="map-container">
         <div id="mapid"></div>
         <div id="map-controls">
-            <button id="setStartPointButton">P1に設定</button>
-            <button id="setEndPointButton" disabled>P2に設定</button>
+            <button id="setStartPointButton">P1(左端)に設定</button>
+            <button id="setEndPointButton">P2(右端)に設定</button>
         </div>
     </div>
 
     <div class="control-group">
-        <label>設定済み座標:</label>
-        <div id="clickCoordinates" class="result-text"></div>
+        <button class="nav-button" onclick="location.href='g_usb.html'">ラップタイマー画面へ移動</button>
     </div>
 
     <div class="control-group">
-        <label>サーキットプリセット:</label>
-        <select id="circuitSelect">
-            <option value="">-- サーキットを選択 --</option>
-        </select>
+        <label>サーキット選択:</label>
+        <select id="circuitSelect"><option value="">-- リストから選択 --</option></select>
         <button id="saveCircuitButton">サーキットを適用</button>
-        <div id="selectedCircuitDisplay" class="result-text">未設定</div>
+        <div id="clickCoordinates" class="result-text">座標: 未設定</div>
     </div>
 
     <div class="control-group">
-        <label>USB GPS 接続設定:</label>
-        <button id="usbTestBtn">USB GPS 接続テストと保存</button>
-        <div id="usbStatus" class="result-text">未接続 (未設定)</div>
+        <label>USB-GPS 接続設定:</label>
+        <button id="usbTestBtn" style="background-color: #6c757d;">USB GPS 接続テストと保存</button>
+        <div id="usbStatus" class="result-text">未設定</div>
     </div>
 
     <div class="control-group">
         <label>点火パルス数 (1回転あたり):</label>
         <select id="pulseSelect">
-            <option value="0.5">0.5 (2回転1点火)</option>
-            <option value="1" selected>1 (1回転1点火)</option>
-            <option value="2">2 (1回転2点火)</option>
+            <option value="0.5">0.5</option><option value="1" selected>1</option>
+            <option value="2">2</option><option value="3">3</option><option value="4">4</option>
         </select>
         <button id="savePulseButton">パルス数を保存</button>
         <div id="setPulse" class="result-text">設定なし</div>
@@ -68,114 +62,122 @@
     <div class="control-group">
         <label>計測閾値 (m):</label>
         <select id="thresholdSelect">
-            <option value="5">5m</option>
-            <option value="10">10m</option>
-            <option value="20" selected>20m</option>
-            <option value="50">50m</option>
+            <script>
+                for(let i=5; i<=50; i+=5) document.write(`<option value="${i}" ${i==20?'selected':''}>${i}m</option>`);
+            </script>
         </select>
         <button id="saveThresholdButton">閾値を保存</button>
         <div id="setThreshold" class="result-text">設定なし</div>
     </div>
 
     <div class="control-group">
-        <label>ラップ間隔制限 (秒):</label>
+        <label>クールダウン (秒):</label>
         <select id="lapCoolDownSelect">
-            <option value="5000">5秒</option>
-            <option value="10000">10秒</option>
-            <option value="15000" selected>15秒</option>
-            <option value="30000">30秒</option>
+            <option value="20000">20秒</option><option value="30000" selected>30秒</option>
+            <option value="40000">40秒</option><option value="50000">50秒</option>
+            <option value="60000">60秒</option><option value="90000">90秒</option>
+            <option value="120000">120秒</option><option value="180000">180秒</option>
         </select>
-        <button id="saveLapCoolDownButton">間隔を保存</button>
+        <button id="saveLapCoolDownButton">秒数を保存</button>
         <div id="setLapCoolDown" class="result-text">設定なし</div>
     </div>
 
     <div class="control-group">
-        <label>GPS更新頻度監視:</label>
+        <label>GPS感度モニター:</label>
         <div id="gpsFrequency" class="result-text">待機中...</div>
     </div>
 
-    <div class="control-group" style="background-color: #fce4e4;">
-        <button id="resetStorageButton" style="background-color: #d9534f;">すべての設定を初期化</button>
+    <div class="control-group" style="background: #fff0f0;">
+        <button id="resetStorageButton" style="background: #d9534f;">全設定を初期化</button>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="circuit_data.js"></script>
 
     <script>
-        let map, startPointMarker, endPointMarker, startLinePolyline, tempMarker;
-        let startPoint = null, endPoint = null;
+        let map, startMarker, endMarker, line, currentCircle, tempMarker;
+        let startPos = null, endPos = null;
 
-        // --- USB接続テスト・保存 (追加) ---
-        document.getElementById('usbTestBtn').onclick = async () => {
-            const status = document.getElementById('usbStatus');
-            try {
-                status.textContent = "スキャン中...";
-                const device = await navigator.usb.requestDevice({ filters: [] });
-                await device.open();
-                if (device.configuration === null) await device.selectConfiguration(1);
-                
-                // 実績のあるインターフェース1、エンドポイント2を保存
-                localStorage.setItem('usb_interface', 1);
-                localStorage.setItem('usb_endpoint', 2);
-                localStorage.setItem('usb_vendor_id', device.vendorId);
-                localStorage.setItem('usb_product_id', device.productId);
-
-                status.textContent = `成功: IF-1 / EP-2 を保存しました`;
-                status.style.color = "#007bff";
-                await device.close();
-            } catch (err) {
-                status.textContent = "接続エラーまたはキャンセル";
-                status.style.color = "#d9534f";
-            }
-        };
-
-        // --- 地図初期化 ---
         function initMap() {
-            map = L.map('mapid').setView([35.681236, 139.767125], 15);
+            map = L.map('mapid').setView([35.68, 139.76], 15);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+            // 現在地取得
+            navigator.geolocation.watchPosition(pos => {
+                const latlng = [pos.coords.latitude, pos.coords.longitude];
+                if (!currentCircle) {
+                    currentCircle = L.circle(latlng, { radius: 5, color: 'blue', fillOpacity: 0.8 }).addTo(map);
+                    map.setView(latlng, 17);
+                } else {
+                    currentCircle.setLatLng(latlng);
+                }
+                document.getElementById('instructionMessage').textContent = "地図をタップしてP1を設定してください";
+            }, null, { enableHighAccuracy: true });
+
             map.on('click', e => {
                 if (tempMarker) map.removeLayer(tempMarker);
-                tempMarker = L.marker(e.latlng).addTo(map);
+                tempMarker = L.marker(e.latlng, { opacity: 0.6 }).addTo(map);
             });
         }
 
-        // --- 座標設定 ---
-        function setPoint(type, latlng) {
+        function setMarker(type, latlng) {
             if (type === 'start') {
-                startPoint = latlng;
-                if (startPointMarker) map.removeLayer(startPointMarker);
-                startPointMarker = L.marker(latlng).addTo(map).bindPopup("P1").openPopup();
-                localStorage.setItem('startLineP1Lat', latlng.lat);
-                localStorage.setItem('startLineP1Lon', latlng.lng);
-                document.getElementById('setEndPointButton').disabled = false;
-                document.getElementById('instructionMessage').textContent = '次にP2を設定してください。';
+                if (startMarker) map.removeLayer(startMarker);
+                startPos = latlng;
+                startMarker = L.marker(latlng, { draggable: true }).addTo(map).bindPopup("P1").openPopup();
+                startMarker.on('dragend', e => { startPos = e.target.getLatLng(); saveCoords(); });
             } else {
-                endPoint = latlng;
-                if (endPointMarker) map.removeLayer(endPointMarker);
-                endPointMarker = L.marker(latlng).addTo(map).bindPopup("P2").openPopup();
-                localStorage.setItem('startLineP2Lat', latlng.lat);
-                localStorage.setItem('startLineP2Lon', latlng.lng);
-                if (startLinePolyline) map.removeLayer(startLinePolyline);
-                startLinePolyline = L.polyline([startPoint, endPoint], {color: 'red'}).addTo(map);
-                document.getElementById('instructionMessage').textContent = '設定完了！';
+                if (endMarker) map.removeLayer(endMarker);
+                endPos = latlng;
+                endMarker = L.marker(latlng, { draggable: true }).addTo(map).bindPopup("P2").openPopup();
+                endMarker.on('dragend', e => { endPos = e.target.getLatLng(); saveCoords(); });
             }
-            displayCoords();
+            saveCoords();
         }
 
-        document.getElementById('setStartPointButton').onclick = () => { if(tempMarker) setPoint('start', tempMarker.getLatLng()); };
-        document.getElementById('setEndPointButton').onclick = () => { if(tempMarker) setPoint('end', tempMarker.getLatLng()); };
-
-        function displayCoords() {
-            const p1 = localStorage.getItem('startLineP1Lat') ? "P1 OK" : "--";
-            const p2 = localStorage.getItem('startLineP2Lat') ? "P2 OK" : "--";
-            document.getElementById('clickCoordinates').textContent = `設定状態: ${p1} / ${p2}`;
+        function saveCoords() {
+            if (startPos) {
+                localStorage.setItem('startLineP1Lat', startPos.lat);
+                localStorage.setItem('startLineP1Lon', startPos.lng || startPos.lon);
+            }
+            if (endPos) {
+                localStorage.setItem('startLineP2Lat', endPos.lat);
+                localStorage.setItem('startLineP2Lon', endPos.lng || endPos.lon);
+            }
+            if (startPos && endPos) {
+                if (line) map.removeLayer(line);
+                line = L.polyline([startPos, endPos], { color: 'red' }).addTo(map);
+            }
+            displayStatus();
         }
 
-        // --- 各種保存ロジック (既存機能) ---
+        function displayStatus() {
+            const p1 = localStorage.getItem('startLineP1Lat') ? "P1:OK" : "P1:--";
+            const p2 = localStorage.getItem('startLineP2Lat') ? "P2:OK" : "P2:--";
+            document.getElementById('clickCoordinates').textContent = `現在設定: ${p1} / ${p2}`;
+        }
+
+        // --- USB接続保存 ---
+        document.getElementById('usbTestBtn').onclick = async () => {
+            try {
+                const device = await navigator.usb.requestDevice({ filters: [] });
+                await device.open();
+                localStorage.setItem('usb_interface', 1);
+                localStorage.setItem('usb_endpoint', 2);
+                document.getElementById('usbStatus').textContent = "保存完了: IF-1 / EP-2";
+                document.getElementById('usbStatus').style.color = "#007bff";
+                await device.close();
+            } catch (e) { document.getElementById('usbStatus').textContent = "キャンセル"; }
+        };
+
+        // --- 保存イベント ---
+        document.getElementById('setStartPointButton').onclick = () => { if(tempMarker) setMarker('start', tempMarker.getLatLng()); };
+        document.getElementById('setEndPointButton').onclick = () => { if(tempMarker) setMarker('end', tempMarker.getLatLng()); };
+        
         document.getElementById('savePulseButton').onclick = () => {
             const v = document.getElementById('pulseSelect').value;
             localStorage.setItem('pl1', v);
-            document.getElementById('setPulse').textContent = v + " パルス/回転";
+            document.getElementById('setPulse').textContent = v + " P/R";
         };
 
         document.getElementById('saveThresholdButton').onclick = () => {
@@ -192,46 +194,22 @@
 
         document.getElementById('saveCircuitButton').onclick = () => {
             const id = document.getElementById('circuitSelect').value;
-            if (typeof circuitData !== 'undefined' && id) {
+            if (id && typeof circuitData !== 'undefined') {
                 const c = circuitData.find(x => x.id == id);
-                localStorage.setItem('startLineP1Lat', c.p1Lat);
-                localStorage.setItem('startLineP1Lon', c.p1Lon);
-                localStorage.setItem('startLineP2Lat', c.p2Lat);
-                localStorage.setItem('startLineP2Lon', c.p2Lon);
-                document.getElementById('selectedCircuitDisplay').textContent = c.name + " 適用済";
-                displayCoords();
+                setMarker('start', { lat: c.p1Lat, lng: c.p1Lon });
+                setMarker('end', { lat: c.p2Lat, lng: c.p2Lon });
+                map.setView([c.p1Lat, c.p1Lon], 17);
             }
         };
 
-        // --- GPSモニタ (既存機能) ---
-        function startGpsFrequencyMonitor() {
-            if ("geolocation" in navigator) {
-                let lastTime = Date.now(), counts = 0;
-                navigator.geolocation.watchPosition(() => {
-                    counts++;
-                    let now = Date.now();
-                    if (now - lastTime >= 2000) {
-                        document.getElementById('gpsFrequency').textContent = (counts / ((now - lastTime) / 1000)).toFixed(1) + " Hz";
-                        counts = 0; lastTime = now;
-                    }
-                }, null, { enableHighAccuracy: true });
-            }
-        }
+        document.getElementById('resetStorageButton').onclick = () => {
+            if(confirm("全リセットしますか？")) { localStorage.clear(); location.reload(); }
+        };
 
-        // --- 初期化 ---
-        function loadAll() {
-            displayCoords();
-            startGpsFrequencyMonitor();
-            document.getElementById('setPulse').textContent = (localStorage.getItem('pl1') || "1") + " パルス";
-            document.getElementById('setThreshold').textContent = (localStorage.getItem('gpsThreshold') || "20") + "m";
-            document.getElementById('setLapCoolDown').textContent = ((localStorage.getItem('lapCoolDownTime') || "15000")/1000) + "秒";
-            
-            const uif = localStorage.getItem('usb_interface');
-            if (uif) {
-                document.getElementById('usbStatus').textContent = `保存済み (IF:${uif})`;
-                document.getElementById('usbStatus').style.color = "#28a745";
-            }
-
+        window.onload = () => {
+            initMap();
+            displayStatus();
+            // サーキット読み込み
             if (typeof circuitData !== 'undefined') {
                 const sel = document.getElementById('circuitSelect');
                 circuitData.forEach(c => {
@@ -239,13 +217,11 @@
                     o.value = c.id; o.textContent = c.name; sel.appendChild(o);
                 });
             }
-        }
-
-        document.getElementById('resetStorageButton').onclick = () => {
-            if(confirm("全リセットしますか？")) { localStorage.clear(); location.reload(); }
+            // 初期表示
+            document.getElementById('setPulse').textContent = (localStorage.getItem('pl1') || "1") + " P/R";
+            document.getElementById('setThreshold').textContent = (localStorage.getItem('gpsThreshold') || "20") + "m";
+            document.getElementById('setLapCoolDown').textContent = ((localStorage.getItem('lapCoolDownTime') || "30000")/1000) + "秒";
         };
-
-        window.onload = () => { initMap(); loadAll(); };
     </script>
 </body>
 </html>
