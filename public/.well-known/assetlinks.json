@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.klap.degi_usb",
+        "sha256_cert_fingerprints": ["FC:38:11:B0:90:60:60:5F:09:F0:15:E2:49:89:0D:8A:CB:3E:2F:63:EB:7A:FB:18:2B:FF:02:08:45:10:97:9B"]
+      }
+    }]
