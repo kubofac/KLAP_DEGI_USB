@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KLAP DEGI 公式マニュアル</title>
+    <style>
+        :root { --main-red: #E4002B; --bg-dark: #121212; --text-white: #eeeeee; --tab-bg: #252525; }
+        body { font-family: sans-serif; line-height: 1.6; background: var(--bg-dark); color: var(--text-white); margin: 0; padding: 0; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        
+        /* タブのデザイン */
+        .tabs-nav { display: flex; gap: 5px; background: var(--tab-bg); padding: 5px; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid #333; }
+        .tab-btn { flex: 1; padding: 15px; border: none; background: none; color: #888; font-weight: bold; cursor: pointer; border-radius: 8px; transition: 0.3s; font-size: 14px; }
+        .tab-btn.active { background: var(--main-red); color: white; }
+
+        /* コンテンツの表示制御 */
+        .tab-content { display: none; animation: fadeIn 0.5s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        header { border-bottom: 2px solid var(--main-red); padding: 20px 0; margin-bottom: 30px; }
+        h1 { color: var(--main-red); font-size: 24px; margin: 0; }
+        h2 { border-left: 5px solid var(--main-red); padding-left: 10px; margin-top: 40px; font-size: 20px; }
+        h3 { color: var(--main-red); font-size: 18px; margin-top: 25px; }
+        
+        .step { background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .info-box { background: #1a1a3a; border: 1px solid #3333ff; padding: 15px; border-radius: 8px; margin: 20px 0; font-size: 14px; }
+        
+        /* --- 💡 追加・修正した画像レイアウト --- */
+        .manual-image { width: 100%; height: auto; display: block; border: 1px solid #444; border-radius: 5px; margin-bottom: 10px; }
+        
+        /* 横並び・縦並びを制御するコンテナ */
+        .flex-row { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; margin: 20px 0; }
+        /* 画像エリア */
+        .flex-img { flex: 1; min-width: 280px; }
+        /* テキストエリア */
+        .flex-txt { flex: 1.2; min-width: 280px; }
+        /* 逆順用（右画像・左文） */
+        .flex-reverse { flex-direction: row-reverse; }
+        /* -------------------------------------- */
+
+        /* 広告カード */
+        .product-card { background: #fff; color: #000; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-decoration: none; margin-top: 20px; text-align: center; }
+        .product-card img { width: 100px; height: 100px; object-fit: contain; }
+        .product-card strong { font-size: 16px; }
+        .ad-notice { font-size: 11px; margin-top: 10px; color: #888; text-align: center; }
+        
+        .footer { margin-top: 50px; font-size: 12px; color: #888; text-align: center; padding-bottom: 40px; }
+        ul, ol { padding-left: 20px; }
+        li { margin-bottom: 10px; }
+
+  /* ダウンロードセクション用 */
+        .dl-card { background: #333; padding: 25px; border-radius: 15px; text-align: center; border: 2px solid var(--main-red); margin: 20px 0; }
+        .dl-btn { display: inline-block; background: var(--main-red); color: white; padding: 15px 30px; border-radius: 50px; text-decoration: none; font-weight: bold; font-size: 18px; box-shadow: 0 4px 15px rgba(228, 0, 43, 0.4); transition: 0.3s; }
+        .dl-btn:hover { transform: scale(1.05); background: #ff1a40; }
+        .warning-box { background: #3a2a1a; border: 1px solid #ffa500; padding: 15px; border-radius: 8px; font-size: 13px; margin-top: 20px; color: #ffca80; text-align: left; }
+
+        .product-card { background: #fff; color: #000; padding: 15px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-decoration: none; margin-top: 20px; text-align: center; }
+        .product-card img { width: 100px; height: 100px; object-fit: contain; }
+        .ad-notice { font-size: 11px; margin-top: 10px; color: #888; text-align: center; }
+
+        .footer { margin-top: 50px; font-size: 12px; color: #888; text-align: center; padding-bottom: 40px; }
+        ul, ol { padding-left: 20px; }
+        li { margin-bottom: 10px; }
+
+
+
+
+
+
+
+    </style>
+</head>
+<body>
+
+<div class="tabs-nav">
+    <button class="tab-btn active" onclick="openTab(event, 'internal-version')">KLAP DEGI GPS</button>
+    <button class="tab-btn" onclick="openTab(event, 'usb-version')">KLAP DEGI USB</button>
+</div>
+
+<div class="container">
+    
+    <header>
+        <h1 id="page-title">KLAP DEGI GPS マニュアル</h1>
+        <p>ラップ計測　メータ設定　ガイド</p>
+    </header>
+
+    <section>
+        <h2>1. アプリの概要</h2>
+        <div class="step">
+            <p>KLAP DEGIは、GPSとBluetoothを活用し、サーキット走行のラップタイムをリアルタイムで計測・表示するアプリです。独自のアルゴリズムにより、走行中の集中力を妨げず、必要な情報を瞬時に提供します。</p>
+            <p><strong>主な機能:</strong> ラップタイム計測（自動/手動）、車速　、タコメーター、水温表示（要専用BLEモジュール）。</p>
+        </div>
+    </section>
+
+    <div id="internal-version" class="tab-content active">
+        <section>
+            <h2>2. 【内蔵GPS版】の準備と操作</h2>
+            <div class="step">
+            
+                <p>外部レシーバーなしで、スマホのGPSのみを使用して計測する手軽なモデルです。</p>
+                <p>さらに、外部Bluetooth GNSS用の高頻度ロケーションアプリとBluetooth外部GPSモジュールを使用すれば高精度の計測が期待できます。</p>
+                <p>推奨ロケーションアプリ Dorroger GPS、Bluetooth外部GPSモジュール (別途お買い求めください）</p>
+                
+                <h3>準備</h3>
+                <ul>
+                    <li><strong>スマホの位置情報はONにしてください</strong> </li>
+
+ <li><strong>Bluetooth外部GPSモジュール接続にはスマホ設定必要です</strong> </li>
+                    <li><strong>地図の表示はネットワーク環境が必要です（サーキット選択した場合はネットワーク不要です）</strong> </li>
+                    <li><strong>外部BluetoothGPSモジュール接続の場合はあらかじめスマホと接続を済ませておいてください</strong> </li>
+                </ul>
+            </div>
+        </section>
+    </div>
+
+    <div id="usb-version" class="tab-content">
+        <section>
+            <h2>2. 【USB外部GPS版】の準備と操作</h2>
+            <div class="step">
+                <div class="flex-row">
+                    <div class="flex-img">
+                        <img src="setuzok.jpg" alt="USB版メイン画面" class="manual-image">
+                    </div>
+                    <div class="flex-txt">
+                        <p>高精度な外部GPSレシーバーを使用して、より正確なデータを取得するモデルです。</p>
+                        <h3>接続手順</h3>
+                        <ul>
+                            <li>OTGアダプター経由でGPSレシーバーをスマホに接続。</li>
+                            <li>「USB GPS 接続テストと保存」を押す</li>
+                            <li>保存成功と表示されれば接続成功です</li>
+                       </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+<section>
+    <h2>3. スタート・ゴールライン設定</h2>
+    <div class="step">
+        <div class="flex-row">
+            <div class="flex-img">
+                <img src="Screenshot_20260131-080113.png" alt="説明" class="manual-image">
+            </div>
+            <div class="flex-txt">
+                <p>スタート・ゴールラインの設定をします</p>
+
+
+                <ul>
+                    <li>P1ボタン（青）を地図上でタップしスタートライン左に置く</li>
+                    <li>P2ボタン（赤）を地図上でタップしスタートライン右に置く</li>
+    <li>P1,P2のポイント表示をドラッグして微調整できます</li>
+ <li>コース進行方向とと直角になるようにラインを設定してください</li>
+ <li>設定後、「スタートラインを決定・保存」を押し、地図左下に表示した　「保存済み：P1:--/P2:--」が「OK」と表示されれば設定成功</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+  
+<section>
+<h2>4. サーキット設定</h2>
+    <div class="step">
+        <div class="flex-row">
+            <div class="flex-img">
+                <img src="Screenshot_20260131-183241.png" alt="サーキット設定" class="manual-image">
+            </div>
+            <div class="flex-txt">
+                <p>スタート・ゴールラインの設定をします</p>
+
+
+                <ul>
+                    <li>「サーキット選択」を押すとリストが表示されます</li>
+                    <li>サーキットを選択し「サーキットを適用」を押す</li>
+
+    <li>「●●適用中」と左下に表示後、「スタートラインを決定・保存」を押し、地図左下に表示した　「保存済み：P1:--/P2:--」が「OK」と表示されれば設定成功</li>
+ <li>サーキットは随時更新予定</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section>
+        <h2>5. 点火パルス</h2>
+        <div class="step">
+            <h3>専用のBLEモジュールが必要です</h3>
+<h3>ラップタイマー計測のみではBLEモジュールの接続は不要です</h3>
+
+            <ul>
+                <li>「点火パルス数（1回転あたり)」を押すとリストが表示されます</li>
+                    <li>パルス数を選択し「パルス数を保存」を押す</li>
+    <li>「●パルス/回転」と左下に表示されれば設定成功</li>
+            </ul>
+    
+            
+        </div>
+    </section>
+<section>
+<h2>6.計測閾値</h2>
+    <div class="step">
+        <div class="flex-row">
+            <div class="flex-img">
+                <img src="Screenshot_20260131-184704.png" alt="閾値" class="manual-image">
+            </div>
+            <div class="flex-txt">
+                <p>計測閾値の設定をします</p>
+ <p>スタートラインからの計測幅の設定になります</p>
+ <p>GPS更新レート/通過速度から設定してください</p>
+ <p>青：速度が速すぎる、更新レートが遅い(スマホは１Hｚ前後）</p>
+ <p>黃：適切</p>
+ <p>このアプリは計測範囲に入ってから前回の位置情報と現在の位置情報からスタートライン通過を予測し測定します</p>
+
+                <ul>
+                    <li>「計測閾値」を押すとリストが表示されます</li>
+                    <li>閾値の長さを選択し「閾値を保存」を押す</li>
+    <li>「●●ｍ」と左下に表示されれば設定成功</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</section>
+<section>
+        <h2>7.クールダウン設定</h2>
+        <div class="step">
+ <p>スタートライン通過後に計測しない時間を設定します</p>
+ <p>スタートラインと隣接するコースがある場合、GPSの精度により2重ラップされるのを防ぎます</p>
+ <p>スタートラインから2重ラップされる恐れのある位置を通過する時間以上に設定してください</p>
+ <p>クールダウン時間経過前にスタートラインを通過するとラップが空振りします</p>
+            <ul>
+                <li>「クールダウン時間」を押すとリストが表示されます</li>
+                    <li>クールダウン時間を選択し「クールダウンをを保存」を押す</li>
+    <li>「●●秒」と左下に表示されれば設定成功</li>
+            </ul>
+    
+            
+        </div>
+    </section>
+<section>
+        <h2>8.設定初期化</h2>
+        <div class="step">
+ <ul>
+                <li>「全設定を初期化」を押すと設定数値が初期化されます</li>
+            </ul>
+    
+            
+        </div>
+    </section>
+
+<section>
+        <h2>9.ラップタイマー起動</h2>
+        <div class="step">
+ <ul>
+                <li>「ラップタイマー画面へ移動」を押すとラップタイマーに移行します</li>
+            </ul>
+    
+            
+        </div>
+    </section>
+
+<section>
+            <h2>10. ラップタイマーボタン</h2>
+            <div class="step">
+                <p>ラップタイマーボタン</p>
+                <img src="Screenshot_20260201-103324.png" alt="GPSラップタイマー" class="manual-image">
+                
+                <ul>
+                    <li><strong>REROAD</strong> 　各種設定を読み込ませます　ボタンが橙色の場合未設定項目があります</li>
+                    <li><strong>INTGPS（GPS版)/USB GPS(USB版）</strong>　位置情報取得後　ボタンを押下後位置情報取得されると赤色に変わります </li>
+                    <li><strong>TIMER</strong> 　計測開始します　GPS計測の場合、ライン通過時15秒間ラップが固定表示されます</li>
+<li><strong>LAP/RESET</strong> 　手動計測開始します　固定表示はされません</li>
+                </ul>
+            </div>
+        </section>
+
+<section>
+            <h2>11. ラップタイマー画面</h2>
+            <div class="step">
+                <p>ラップタイマー画面</p>
+                <img src="Screenshot_20260201-104822.png" alt="GPSラップタイマー" class="manual-image">
+                
+                <ul>
+                    <li><strong>ラップ</strong> 　現在ラップを表示します</li>
+                    <li><strong>経過時間</strong>　ラップ計測経過してからの経過時間を表示します </li>
+                    <li><strong>ラップ履歴</strong> 　ラップ履歴を表示します　ベストラップは赤文字で表示します</li>
+<li><strong>速度</strong> 　GPSで取得した速度を表示します</li>
+<h3>緑文字の以下は別途BLEモジュールが必要です</h3>
+<li><strong>タコメーターバー</strong> 　回転数をバー表示します</li>
+<li><strong>回転数</strong> 　回転数を表示します</li>
+<li><strong>水温</strong> 　温度を表示します</li>
+                </ul>
+            </div>
+        </section>
+
+
+ <section>
+            <h2>Android用アプリ配布 (GPS版)</h2>
+            <div class="dl-card">
+                <h3>KLAP DEGI GPS</h3>
+                <p>Version 1.0.0 | 2026/02/01 更新</p>
+                <br>
+                <a href="klap_degi_gps.apk" class="dl-btn" download>アプリをダウンロード</a>
+                <div class="warning-box">
+                    <strong>⚠️ セキュリティ警告について</strong><br>
+                    直接ダウンロードしたファイルは「有害なファイルの可能性があります」と警告が出ますが、これは公式ストア以外からのファイル全てに出る警告です。そのまま「ダウンロードを続行」を選択してください。
+                </div>
+            </div>
+           
+        </section>
+
+ <section>
+            <h2>Android用アプリ配布 (USB版)</h2>
+            <div class="dl-card">
+                <h3>KLAP DEGI USB</h3>
+                <p>Version 1.0.0 | 2026/02/01 更新</p>
+                <br>
+                <a href="klap_degi_usb.apk" class="dl-btn" download>アプリをダウンロード</a>
+                <div class="warning-box">
+                    <strong>⚠️ セキュリティ警告について</strong><br>
+                    直接ダウンロードしたファイルは「有害なファイルの可能性があります」と警告が出ますが、これは公式ストア以外からのファイル全てに出る警告です。そのまま「ダウンロードを続行」を選択してください。
+                </div>
+            </div>
+            <div class="step">
+                <h3>インストール手順</h3>
+                <ol>
+                    <li>「アプリをダウンロード」ボタンをタップ。</li>
+                    <li>ダウンロード完了後、ファイルを開く。</li>
+                    <li>セキュリティ警告が出た場合、「設定」を選択。</li>
+                    <li>「この提供元のアプリを許可」をONにしてインストール。</li>
+                </ol>
+            </div>
+        </section>
+
+
+
+
+
+
+
+  
+    <section>
+
+
+
+
+
+
+
+
+
+
+
+
+        <h2>推奨機材</h2>
+        <a href="https://your-amazon-link" class="product-card" target="_blank">
+            <img src="https://m.media-amazon.com/images/I/example.jpg" alt="推奨GPS">
+            <strong>高精度 10Hz GPSレシーバー</strong>
+            <p>USB版での使用に最適な動作確認済みモデルです。</p>
+        </a>
+        <p class="ad-notice">※本ページはアフィリエイト広告を利用しています。Amazonアソシエイト・プログラムの参加者です。</p>
+    </section>
+
+    <div class="footer">
+        &copy; 2026 KLAP DEGI Project. All Rights Reserved.
+    </div>
+</div>
+
+<script>
+    function openTab(evt, tabName) {
+        var i, tabcontent, tablinks;
+        tabcontent = document.getElementsByClassName("tab-content");
+        for (i = 0; i < tabcontent.length; i++) {
+            tabcontent[i].classList.remove("active");
+        }
+        tablinks = document.getElementsByClassName("tab-btn");
+        for (i = 0; i < tablinks.length; i++) {
+            tablinks[i].classList.remove("active");
+        }
+        document.getElementById(tabName).classList.add("active");
+        evt.currentTarget.classList.add("active");
+
+        const title = document.getElementById('page-title');
+        title.innerText = tabName === 'usb-version' ? 'KLAP DEGI (USB版) マニュアル' : 'KLAP DEGI (内蔵GPS版) マニュアル';
+        
+        window.scrollTo(0, 0);
+    }
+</script>
+
+</body>
+</html>
