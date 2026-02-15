@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>KLAP_DEGI_USB - Full Path Logging Edition</title>
+    <title>KLAP_DEGI_USB - Log & Design Integrated</title>
     <style>
         :root { 
             --hrc-red: #E4002B; 
@@ -22,6 +22,7 @@
         #dashboard { position: relative; display: flex; flex-direction: column; height: 100dvh; width: 100vw; }
         #canvas { position: absolute; top: 0; left: 0; width: 100% !important; height: calc(100% - 60px) !important; z-index: 1; }
         
+        /* デザイン版のCSSをそのまま移植 */
         .main-ui-container {
             position: absolute; 
             right: 10px; 
@@ -92,6 +93,7 @@
 <script>
 'use strict';
 
+// --- 各種定数とログ用変数 ---
 const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
 const PULSE_UUID = "f4deb353-a4cf-4ffb-badb-2a5f2e3bb630";
 let currentRPM = 0, currentTemp = 0, device = null, nmeaBuffer = '', lastPos = null;
@@ -101,17 +103,16 @@ let lastUsbDataTime = 0, lastBleDataTime = 0, isGpsFixed = false;
 let usbWaiting = false, bleWaiting = false, isFrozen = false;
 let freezeDisplayTime = "", freezeStartTime = 0, previousSideOfLine = null, lastLapTime = 0;
 let currentSpeedKmh = 0, maxSpeed = 0, sessionMaxSpeed = 0;
-
-// --- ログ保存用変数の強化 ---
-let allPoints = []; // スタートからストップまでの全座標を保持
-let lapIndexMarkers = [0]; // ラップ通過時のallPointsのインデックスを記録
+let trackLogs = [], currentLapLog = [];
 
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 
+// --- 曲線タコメーターの移植 ---
 function drawTacho(rpm) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const w = canvas.width, h = canvas.height, segments = 75, active = Math.floor((rpm / 14000) * segments);
     const sX = 20, hY = 80, bY = h - 20, rad = bY - hY, curveEnd = 30;
+    
     for (let i = 0; i <= segments; i++) {
         let x, y, ang, prog;
         if (i <= curveEnd) {
@@ -131,6 +132,7 @@ function drawTacho(rpm) {
     document.getElementById('rpm_val').textContent = Math.floor(rpm);
 }
 
+// --- ロギング・通信・タイマーロジック (統合) ---
 async function startUsbGps() {
     try {
         device = await navigator.usb.requestDevice({ filters: [] });
@@ -180,15 +182,12 @@ function parseNMEA(line) {
             currentSpeedKmh = Math.round(parseFloat(p[7]) * 1.852);
             document.getElementById('speed_val').textContent = currentSpeedKmh;
             if (currentSpeedKmh > maxSpeed) maxSpeed = currentSpeedKmh;
-            if (currentSpeedKmh > sessionMaxSpeed) sessionMaxSpeed = currentSpeedKmh;
+            if (maxSpeed > sessionMaxSpeed) sessionMaxSpeed = maxSpeed;
         }
     }
     if (line.includes('GGA') && p[6] !== '0') {
         const cur = { lat: dmmToDec(p[2], p[3]), lon: dmmToDec(p[4], p[5]), time: Date.now(), rpm: currentRPM, temp: currentTemp, speed: currentSpeedKmh };
-        
-        // 計測中なら全座標を保存
-        if (swState === 1) allPoints.push(cur);
-
+        if (swState === 1) currentLapLog.push(cur);
         if (swState === 1 && LAP_LINE_P1.lat !== 0) {
             const side = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (cur.lat - LAP_LINE_P1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (cur.lon - LAP_LINE_P1.lon);
             if (lastPos && previousSideOfLine !== null && ((previousSideOfLine > 0 && side < 0) || (previousSideOfLine < 0 && side > 0))) {
@@ -203,10 +202,8 @@ function parseNMEA(line) {
 function processLap(exactTime, useFreeze) {
     const lapTime = exactTime - (lapStartTime || startTime);
     lapRecords.unshift(lapTime);
-    
-    // ★ラップ通過時の座標位置をマーカーとして記録
-    lapIndexMarkers.push(allPoints.length);
-
+    trackLogs.push([...currentLapLog]);
+    currentLapLog = [];
     const finishedLapMaxSpeed = maxSpeed; maxSpeed = 0; 
     lapStartTime = exactTime; lastLapTime = exactTime;
     
@@ -225,30 +222,17 @@ function processLap(exactTime, useFreeze) {
 }
 
 function exportGPX() {
-    if (allPoints.length === 0) return;
-    
+    if (trackLogs.length === 0 && currentLapLog.length === 0) return;
+    const all = [...trackLogs, currentLapLog];
     let gpx = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="KLAP_DEGI" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">`;
-    
-    // ラップマーカーに基づいてセグメント（trkseg）を分けて全データ出力
-    for (let i = 0; i < lapIndexMarkers.length; i++) {
-        const startIdx = lapIndexMarkers[i];
-        const endIdx = lapIndexMarkers[i+1] || allPoints.length; 
-        if (startIdx >= endIdx && i < lapIndexMarkers.length - 1) continue;
-
-        // セグメント名の定義
-        let segmentName = `Lap ${i}`;
-        if (i === 0) segmentName = "Out-Lap";
-        if (i === lapIndexMarkers.length - 1) segmentName = "In-Lap / Pit";
-
-        gpx += `\n<trk><name>${segmentName}</name><trkseg>`;
-        for (let j = startIdx; j < endIdx; j++) {
-            const p = allPoints[j];
-            if(!p) continue;
+    all.forEach((lap, i) => {
+        if (lap.length === 0) return;
+        gpx += `\n<trk><name>Lap ${i+1}</name><trkseg>`;
+        lap.forEach(p => { 
             gpx += `\n  <trkpt lat="${p.lat}" lon="${p.lon}"><time>${new Date(p.time).toISOString()}</time><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>${Math.round(p.rpm)}</gpxtpx:hr><gpxtpx:atemp>${p.temp}</gpxtpx:atemp></gpxtpx:TrackPointExtension><speed>${(p.speed / 3.6).toFixed(2)}</speed></extensions></trkpt>`; 
-        }
+        });
         gpx += `\n</trkseg></trk>`;
-    }
-    
+    });
     gpx += `\n</gpx>`;
     const blob = new Blob([gpx], { type: 'application/gpx+xml' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `RaceLog_${Date.now()}.gpx`; a.click();
@@ -273,6 +257,7 @@ function tick() {
     requestAnimationFrame(tick);
 }
 
+// 通信状態監視
 setInterval(() => {
     const now = Date.now();
     const uBtn = document.getElementById('usbGpsBtn'), bBtn = document.getElementById('btConnect');
@@ -285,8 +270,7 @@ document.getElementById('btConnect').onclick = ble;
 document.getElementById('saveLogBtn').onclick = exportGPX;
 document.getElementById('startBtn').onclick = () => {
     if (swState !== 1) {
-        swState = 1; startTime = Date.now(); lapStartTime = startTime; 
-        allPoints = []; lapIndexMarkers = [0]; lapRecords = []; 
+        swState = 1; startTime = Date.now(); lapStartTime = startTime; trackLogs = []; currentLapLog = [];
         document.getElementById('startBtn').classList.add('active');
         document.getElementById('saveLogBtn').style.display = 'none';
         tick();
@@ -297,12 +281,9 @@ document.getElementById('startBtn').onclick = () => {
 };
 document.getElementById('lapBtn').onclick = () => { 
     if(swState === 1) processLap(Date.now(), false); 
-    else { 
-        swState = 0; lapRecords = []; allPoints = []; lapIndexMarkers = [0]; maxSpeed = 0; sessionMaxSpeed = 0;
+    else { swState = 0; lapRecords = []; trackLogs = []; currentLapLog = []; maxSpeed = 0; sessionMaxSpeed = 0;
         document.getElementById('max_speed_val').textContent = "0";
-        document.getElementById('lap').innerHTML = ""; 
-        document.getElementById('display1').textContent = "00:00.000"; 
-        document.getElementById('display').textContent = "TOTAL 00:00.000";
+        document.getElementById('lap').innerHTML = ""; document.getElementById('display1').textContent = "00:00.000"; document.getElementById('display').textContent = "TOTAL 00:00.000";
     }
 };
 document.getElementById('reloadBtn').onclick = () => location.reload();
