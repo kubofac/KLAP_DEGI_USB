@@ -101,13 +101,13 @@ let LAP_LINE_P1 = { lat: 0, lon: 0 }, LAP_LINE_P2 = { lat: 0, lon: 0 };
 let swState = 0, startTime = 0, lapStartTime = 0, lapRecords = [];
 let lastUsbDataTime = 0, lastBleDataTime = 0, isGpsFixed = false;
 let usbWaiting = false, bleWaiting = false, isFrozen = false;
-let freezeDisplayTime = "", freezeStartTime = 0, previousSideOfLine = null, lastLapTime = 0;
+let freezeDisplayTime = "", freezeStartTime = 0, lastLapTime = 0;
 let currentSpeedKmh = 0, maxSpeed = 0, sessionMaxSpeed = 0;
 let trackLogs = [], currentLapLog = [];
 
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 
-// --- 曲線タコメーターの移植 ---
+// --- 曲線タコメーター ---
 function drawTacho(rpm) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const w = canvas.width, h = canvas.height, segments = 75, active = Math.floor((rpm / 14000) * segments);
@@ -132,7 +132,42 @@ function drawTacho(rpm) {
     document.getElementById('rpm_val').textContent = Math.floor(rpm);
 }
 
-// --- ロギング・通信・タイマーロジック (統合) ---
+// --- 1. ヘルパー関数 (座標変換・距離計算・線分交差判定) ---
+
+function dmmToDec(dmm, dir) { 
+    if(!dmm || dmm.indexOf('.') === -1) return 0;
+    const dot = dmm.indexOf('.'); 
+    const d = parseInt(dmm.substring(0, dot-2)), m = parseFloat(dmm.substring(dot-2)); 
+    let dec = d + (m/60); return (dir === 'S' || dir === 'W') ? -dec : dec; 
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3;
+    const f1 = lat1 * Math.PI / 180, f2 = lat2 * Math.PI / 180;
+    const df = (lat2 - lat1) * Math.PI / 180, dl = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(df/2)**2 + Math.cos(f1) * Math.cos(f2) * Math.sin(dl/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function getIntersectionTime(p1, p2) {
+    // 分母: 行列式により平行チェック
+    const den = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (p2.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (p2.lon - p1.lon);
+    if (Math.abs(den) < 1e-10) return null;
+
+    // 自車の軌跡に対する交差比率 t
+    const t = ((LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (LAP_LINE_P1.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (LAP_LINE_P1.lon - p1.lon)) / den;
+    // スタートラインに対する交差比率 u
+    const u = ((p1.lat - p2.lat) * (LAP_LINE_P1.lon - p1.lon) - (p1.lon - p2.lon) * (LAP_LINE_P1.lat - p1.lat)) / den;
+
+    // t, u ともに 0～1 であれば、スタートラインという「門」の中を通過した証拠
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+        return p1.time + (p2.time - p1.time) * t; // 線形補間された時刻
+    }
+    return null;
+}
+
+// --- 2. 通信・NMEA解析 ---
+
 async function startUsbGps() {
     try {
         device = await navigator.usb.requestDevice({ filters: [] });
@@ -166,13 +201,6 @@ async function ble() {
     } catch (e) { console.error(e); bleWaiting = false; }
 }
 
-function dmmToDec(dmm, dir) { 
-    if(!dmm) return 0;
-    const dot = dmm.indexOf('.'); 
-    const d = parseInt(dmm.substring(0, dot-2)), m = parseFloat(dmm.substring(dot-2)); 
-    let dec = d + (m/60); return (dir === 'S' || dir === 'W') ? -dec : dec; 
-}
-
 function parseNMEA(line) {
     const p = line.split(',');
     if (line.includes('RMC')) {
@@ -187,24 +215,40 @@ function parseNMEA(line) {
     }
     if (line.includes('GGA') && p[6] !== '0') {
         const cur = { lat: dmmToDec(p[2], p[3]), lon: dmmToDec(p[4], p[5]), time: Date.now(), rpm: currentRPM, temp: currentTemp, speed: currentSpeedKmh };
-        if (swState === 1) currentLapLog.push(cur);
-        if (swState === 1 && LAP_LINE_P1.lat !== 0) {
-            const side = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (cur.lat - LAP_LINE_P1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (cur.lon - LAP_LINE_P1.lon);
-            if (lastPos && previousSideOfLine !== null && ((previousSideOfLine > 0 && side < 0) || (previousSideOfLine < 0 && side > 0))) {
-                if (Date.now() - lastLapTime >= (parseFloat(localStorage.getItem('lapCoolDownTime')) || 15000)) processLap(Date.now(), true);
+        
+        if (swState === 1) {
+            currentLapLog.push(cur);
+            // --- 正確な判定ロジック ---
+            if (lastPos && LAP_LINE_P1.lat !== 0) {
+                const intersectionTime = getIntersectionTime(lastPos, cur);
+                if (intersectionTime !== null) {
+                    const timeSinceLastLap = Date.now() - lastLapTime;
+                    const coolDown = parseFloat(localStorage.getItem('lapCoolDownTime')) || 15000;
+                    const dist = calculateDistance(cur.lat, cur.lon, LAP_LINE_P1.lat, LAP_LINE_P1.lon);
+                    const threshold = parseFloat(localStorage.getItem('gpsThreshold')) || 30;
+
+                    if (timeSinceLastLap >= coolDown && dist <= threshold) {
+                        processLap(intersectionTime, true);
+                    }
+                }
             }
-            previousSideOfLine = side;
         }
         lastPos = cur;
     }
 }
 
+// --- 3. ラップ処理・タイマー ---
+
 function processLap(exactTime, useFreeze) {
     const lapTime = exactTime - (lapStartTime || startTime);
+    if (lapTime <= 0) return;
+
     lapRecords.unshift(lapTime);
     trackLogs.push([...currentLapLog]);
     currentLapLog = [];
     const finishedLapMaxSpeed = maxSpeed; maxSpeed = 0; 
+    
+    // 次の計測開始は「ゲートを跨いだその瞬間」から。これでズレが累積しない。
     lapStartTime = exactTime; lastLapTime = exactTime;
     
     const d = document.getElementById('lap'); d.innerHTML = "";
@@ -219,23 +263,6 @@ function processLap(exactTime, useFreeze) {
         document.getElementById('max_speed_val').style.color = (finishedLapMaxSpeed >= sessionMaxSpeed) ? "#E4002B" : "#ffffff";
         freezeStartTime = Date.now(); 
     }
-}
-
-function exportGPX() {
-    if (trackLogs.length === 0 && currentLapLog.length === 0) return;
-    const all = [...trackLogs, currentLapLog];
-    let gpx = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="KLAP_DEGI" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">`;
-    all.forEach((lap, i) => {
-        if (lap.length === 0) return;
-        gpx += `\n<trk><name>Lap ${i+1}</name><trkseg>`;
-        lap.forEach(p => { 
-            gpx += `\n  <trkpt lat="${p.lat}" lon="${p.lon}"><time>${new Date(p.time).toISOString()}</time><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>${Math.round(p.rpm)}</gpxtpx:hr><gpxtpx:atemp>${p.temp}</gpxtpx:atemp></gpxtpx:TrackPointExtension><speed>${(p.speed / 3.6).toFixed(2)}</speed></extensions></trkpt>`; 
-        });
-        gpx += `\n</trkseg></trk>`;
-    });
-    gpx += `\n</gpx>`;
-    const blob = new Blob([gpx], { type: 'application/gpx+xml' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `RaceLog_${Date.now()}.gpx`; a.click();
 }
 
 function timeFormat(ms) { 
@@ -257,7 +284,25 @@ function tick() {
     requestAnimationFrame(tick);
 }
 
-// 通信状態監視
+// --- 4. ログ出力・イベント制御 ---
+
+function exportGPX() {
+    if (trackLogs.length === 0 && currentLapLog.length === 0) return;
+    const all = [...trackLogs, currentLapLog];
+    let gpx = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="KLAP_DEGI" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">`;
+    all.forEach((lap, i) => {
+        if (lap.length === 0) return;
+        gpx += `\n<trk><name>Lap ${i+1}</name><trkseg>`;
+        lap.forEach(p => { 
+            gpx += `\n  <trkpt lat="${p.lat}" lon="${p.lon}"><time>${new Date(p.time).toISOString()}</time><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>${Math.round(p.rpm)}</gpxtpx:hr><gpxtpx:atemp>${p.temp}</gpxtpx:atemp></gpxtpx:TrackPointExtension><speed>${(p.speed / 3.6).toFixed(2)}</speed></extensions></trkpt>`; 
+        });
+        gpx += `\n</trkseg></trk>`;
+    });
+    gpx += `\n</gpx>`;
+    const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `RaceLog_${Date.now()}.gpx`; a.click();
+}
+
 setInterval(() => {
     const now = Date.now();
     const uBtn = document.getElementById('usbGpsBtn'), bBtn = document.getElementById('btConnect');
