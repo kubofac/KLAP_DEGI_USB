@@ -93,7 +93,7 @@ let trackLogs = [], currentLapLog = [];
 
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 
-// --- 1. 数学的判定ロジック (線分交差 + 時間補間) ---
+// --- 1. 数学的判定ロジック (線分交差 + 時間補間 + 逆走防止) ---
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
@@ -103,19 +103,39 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
+// 線分(p1-p2)とスタートライン(LAP_LINE_P1-P2)の交差および「向き」を計算
 function getIntersectionTime(p1, p2) {
     if (!LAP_LINE_P1.lat || !LAP_LINE_P2.lat) return null;
     const x1 = p1.lon, y1 = p1.lat, x2 = p2.lon, y2 = p2.lat;
     const x3 = LAP_LINE_P1.lon, y3 = LAP_LINE_P1.lat, x4 = LAP_LINE_P2.lon, y4 = LAP_LINE_P2.lat;
 
+    // 行列式による交差判定
     const den = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
     if (Math.abs(den) < 1e-12) return null; // 完全並走/平行
 
     const t = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / den; // 自車移動上の交点(0-1)
     const u = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / den; // ライン上の交点(0-1)
 
+    // t, u ともに 0〜1 ならば、ラインの有効幅（門）を通過した
     if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-        return p1.time + (p2.time - p1.time) * t; 
+        
+        // --- 逆走防止判定 (外積: Cross Product) ---
+        // P1(左) -> P2(右) へのベクトル L
+        const Lx = x4 - x3;
+        const Ly = y4 - y3;
+        // 自車の移動ベクトル V (p1 -> p2)
+        const Vx = x2 - x1;
+        const Vy = y2 - y1;
+
+        // 外積がプラスなら「順走（ラインを前から跨いだ）」
+        const crossProduct = (Lx * Vy) - (Ly * Vx);
+
+        if (crossProduct > 0) {
+            return p1.time + (p2.time - p1.time) * t; 
+        } else {
+            console.log("Direction check: Backward crossing ignored.");
+            return null;
+        }
     }
     return null;
 }
@@ -178,12 +198,14 @@ function parseNMEA(line) {
         
         if (swState === 1) {
             currentLapLog.push(cur);
-            // --- 最新の精密判定ロジック ---
+            // --- 最新の精密判定ロジック (逆走防止込み) ---
             if (lastPos && LAP_LINE_P1.lat !== 0) {
                 const intersectionTime = getIntersectionTime(lastPos, cur);
                 if (intersectionTime !== null) {
                     const timeSinceLastLap = intersectionTime - lastLapTime;
                     const coolDown = parseFloat(localStorage.getItem('lapCoolDownTime')) || 15000;
+                    
+                    // P1からの距離閾値チェック（円の判定）
                     const dist = calculateDistance(cur.lat, cur.lon, LAP_LINE_P1.lat, LAP_LINE_P1.lon);
                     const threshold = parseFloat(localStorage.getItem('gpsThreshold')) || 40;
 
@@ -208,7 +230,6 @@ function processLap(exactTime, useFreeze) {
     currentLapLog = [];
     const finishedLapMaxSpeed = maxSpeed; maxSpeed = 0; 
     
-    // 理論上の通過時刻を次の計測の起点にする
     lapStartTime = exactTime; lastLapTime = exactTime;
     
     const d = document.getElementById('lap'); d.innerHTML = "";
