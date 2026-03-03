@@ -84,6 +84,7 @@
 const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", PULSE_UUID = "f4deb353-a4cf-4ffb-badb-2a5f2e3bb630";
 let currentRPM = 0, currentTemp = 0, device = null, nmeaBuffer = '', lastPos = null;
 let LAP_LINE_P1 = { lat: 0, lon: 0 }, LAP_LINE_P2 = { lat: 0, lon: 0 };
+let detectedDirection = null; // 💡 最初の通過方向を保持 (null, 1, または -1)
 let swState = 0, startTime = 0, lapStartTime = 0, lapRecords = [];
 let lastUsbDataTime = 0, lastBleDataTime = 0, isGpsFixed = false;
 let usbWaiting = false, bleWaiting = false, isFrozen = false;
@@ -93,7 +94,7 @@ let trackLogs = [], currentLapLog = [];
 
 const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
 
-// --- 1. 数学的判定ロジック (線分交差 + 時間補間 + 逆走防止) ---
+// --- 1. 数学的判定ロジック (線分交差 + カプセル判定 + 方向記憶) ---
 
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
@@ -116,25 +117,29 @@ function getIntersectionTime(p1, p2) {
     const t = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / den; // 自車移動上の交点(0-1)
     const u = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / den; // ライン上の交点(0-1)
 
-    // t, u ともに 0〜1 ならば、ラインの有効幅（門）を通過した
-    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+    // tが 0〜1 ならば、自車がライン（延長線含む）を跨いだ
+    if (t >= 0 && t <= 1) {
         
-        // --- 逆走防止判定 (外積: Cross Product) ---
-        // P1(左) -> P2(右) へのベクトル L
-        const Lx = x4 - x3;
+        // --- 方向判定 (外積: Cross Product) ---
+        const Lx = x4 - x3; // P1 -> P2 へのベクトル
         const Ly = y4 - y3;
-        // 自車の移動ベクトル V (p1 -> p2)
-        const Vx = x2 - x1;
+        const Vx = x2 - x1; // 自車の移動ベクトル
         const Vy = y2 - y1;
-
-        // 外積がプラスなら「順走（ラインを前から跨いだ）」
         const crossProduct = (Lx * Vy) - (Ly * Vx);
+        const currentMoveDir = crossProduct > 0 ? 1 : -1;
 
-        if (crossProduct > 0) {
+        // 💡【あなたのアイデア】初回通過時に方向を記憶
+        if (detectedDirection === null) {
+            detectedDirection = currentMoveDir;
+            console.log("Start direction memorized: " + detectedDirection);
+        }
+
+        // 💡【カプセル判定】記憶した方向と一致し、かつP1-P2の有効幅（遊び含む）を通過したか
+        // u = 0〜1 がP1-P2間。少し外れても良いように -0.2 〜 1.2 としています。
+        if (currentMoveDir === detectedDirection && u >= -0.2 && u <= 1.2) {
             return p1.time + (p2.time - p1.time) * t; 
         } else {
-            console.log("Direction check: Backward crossing ignored.");
-            return null;
+            console.log("Crossing ignored: Wrong direction or out of capsule.");
         }
     }
     return null;
@@ -198,14 +203,13 @@ function parseNMEA(line) {
         
         if (swState === 1) {
             currentLapLog.push(cur);
-            // --- 最新の精密判定ロジック (逆走防止込み) ---
             if (lastPos && LAP_LINE_P1.lat !== 0) {
                 const intersectionTime = getIntersectionTime(lastPos, cur);
                 if (intersectionTime !== null) {
                     const timeSinceLastLap = intersectionTime - lastLapTime;
                     const coolDown = parseFloat(localStorage.getItem('lapCoolDownTime')) || 15000;
                     
-                    // P1からの距離閾値チェック（円の判定）
+                    // カプセル判定と方向記憶を getIntersectionTime 内で行っているため、ここでは距離チェックのみ
                     const dist = calculateDistance(cur.lat, cur.lon, LAP_LINE_P1.lat, LAP_LINE_P1.lon);
                     const threshold = parseFloat(localStorage.getItem('gpsThreshold')) || 40;
 
@@ -333,9 +337,13 @@ document.getElementById('startBtn').onclick = () => {
 };
 document.getElementById('lapBtn').onclick = () => { 
     if(swState === 1) processLap(Date.now(), false); 
-    else { swState = 0; lapRecords = []; trackLogs = []; currentLapLog = []; maxSpeed = 0; sessionMaxSpeed = 0; lastPos = null;
+    else { 
+        swState = 0; lapRecords = []; trackLogs = []; currentLapLog = []; maxSpeed = 0; sessionMaxSpeed = 0; lastPos = null;
+        detectedDirection = null; // 💡 方向記憶をリセット
         document.getElementById('max_speed_val').textContent = "0";
-        document.getElementById('lap').innerHTML = ""; document.getElementById('display1').textContent = "00:00.000"; document.getElementById('display').textContent = "TOTAL 00:00.000";
+        document.getElementById('lap').innerHTML = ""; 
+        document.getElementById('display1').textContent = "00:00.000"; 
+        document.getElementById('display').textContent = "TOTAL 00:00.000";
     }
 };
 document.getElementById('reloadBtn').onclick = () => location.reload();
