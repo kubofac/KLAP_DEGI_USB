@@ -188,41 +188,41 @@ async function ble() {
 
 function parseNMEA(line) {
     const p = line.split(',');
-    if (line.includes('RMC')) {
-        lastUsbDataTime = Date.now();
-        isGpsFixed = (p[2] === 'A');
-        if (isGpsFixed) {
-            currentSpeedKmh = Math.round(parseFloat(p[7]) * 1.852);
-            document.getElementById('speed_val').textContent = currentSpeedKmh;
-            if (currentSpeedKmh > maxSpeed) maxSpeed = currentSpeedKmh;
-            if (maxSpeed > sessionMaxSpeed) sessionMaxSpeed = maxSpeed;
-        }
-    }
+    // GGA文（位置情報）かつ測位状態が有効(0以外)であることを確認
     if (line.includes('GGA') && p[6] !== '0') {
-        const cur = { lat: dmmToDec(p[2], p[3]), lon: dmmToDec(p[4], p[5]), time: Date.now(), rpm: currentRPM, temp: currentTemp, speed: currentSpeedKmh };
-        
+        const cur = { 
+            lat: dmmToDec(p[2], p[3]), 
+            lon: dmmToDec(p[4], p[5]), 
+            time: Date.now() 
+        };
+
+        // TIMERがON（計測中）のとき
         if (swState === 1) {
             currentLapLog.push(cur);
+
+            // 前回の位置(lastPos)があり、かつスタートライン(P1)が設定されている場合
             if (lastPos && LAP_LINE_P1.lat !== 0) {
+                
+                // 💡 【修正の核心】
+                // 従来の「dist <= threshold」という点からの距離判定（円形の門番）を削除。
+                // 直接カプセル判定（線分交差）を実行します。
                 const intersectionTime = getIntersectionTime(lastPos, cur);
+
+                // intersectionTimeがnullでない ＝ 「カプセルの範囲内でラインを跨いだ」
                 if (intersectionTime !== null) {
                     const timeSinceLastLap = intersectionTime - lastLapTime;
-                    const coolDown = parseFloat(localStorage.getItem('lapCoolDownTime')) || 15000;
-                    
-                    // カプセル判定と方向記憶を getIntersectionTime 内で行っているため、ここでは距離チェックのみ
-                    const dist = calculateDistance(cur.lat, cur.lon, LAP_LINE_P1.lat, LAP_LINE_P1.lon);
-                    const threshold = parseFloat(localStorage.getItem('gpsThreshold')) || 40;
+                    const coolDown = parseFloat(localStorage.getItem('lapCoolDownTime')) || 30000;
 
-                    if (timeSinceLastLap >= coolDown && dist <= threshold) {
+                    // クールダウン（例：30秒）さえ過ぎていれば、ラップ確定！
+                    if (timeSinceLastLap >= coolDown) {
                         processLap(intersectionTime, true);
                     }
                 }
             }
         }
-        lastPos = cur;
+        lastPos = cur; // 今回の地点を次回の「前回の地点」として保存
     }
 }
-
 // --- 3. ラップ管理・描画 ---
 
 function processLap(exactTime, useFreeze) {
