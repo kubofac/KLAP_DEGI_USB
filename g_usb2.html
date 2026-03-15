@@ -189,52 +189,55 @@ async function ble() {
 function parseNMEA(line) {
     const p = line.split(',');
     
-    // --- 1. RMC文での速度取得とFIX判定 ---
+    // --- 1. RMC文：速度(km/h)の取得と保存 ---
     if (line.includes('RMC') && p[2] === 'A') {
-        isGpsFixed = true; // 測位確定
-        lastUsbDataTime = Date.now(); // 通信時刻更新
+        isGpsFixed = true; 
+        lastUsbDataTime = Date.now(); 
         
         currentSpeedKmh = parseFloat(p[7]) * 1.852; // ノットをkm/hに変換
         if (currentSpeedKmh > maxSpeed) {
             maxSpeed = Math.round(currentSpeedKmh);
             if (maxSpeed > sessionMaxSpeed) sessionMaxSpeed = maxSpeed;
         }
+        // 【追加】画面のSPEED表示を更新
+        const speedEl = document.getElementById('speed_val');
+        if(speedEl) speedEl.textContent = Math.round(currentSpeedKmh);
     }
 
-    // --- 2. GGA文での位置情報取得とFIX判定 ---
+    // --- 2. GGA文：位置情報の取得と、その瞬間の車両データをパッキング ---
     if (line.includes('GGA') && p[6] !== '0' && p[6] !== '') {
-        isGpsFixed = true; // 測位確定
-        lastUsbDataTime = Date.now(); // 通信時刻更新
+        isGpsFixed = true; 
+        lastUsbDataTime = Date.now(); 
 
         const cur = { 
             lat: dmmToDec(p[2], p[3]), 
             lon: dmmToDec(p[4], p[5]), 
-            time: Date.now() 
+            time: Date.now(),
+            // 💡【重要】解析アプリ用の紐付けデータ
+            // ここで保存しておかないと、GPX出力時に値が消えてNaNになります
+            speed: currentSpeedKmh || 0,
+            rpm: currentRPM || 0,
+            temp: currentTemp || 0
         };
 
-        // TIMERがON（計測中）のときのみラップ判定を実行
-        if (swState === 1) {
+        if (swState === 1) { // TIMERがONのとき
             currentLapLog.push(cur);
 
-            // 前回の位置(lastPos)があり、かつスタートラインが設定されている場合
             if (lastPos && LAP_LINE_P1.lat !== 0) {
-                
-                // カプセル判定（線分交差）を実行
+                // 線分交差による精密な通過判定
                 const intersectionTime = getIntersectionTime(lastPos, cur);
 
-                // ラインを跨いだ場合
                 if (intersectionTime !== null) {
                     const timeSinceLastLap = intersectionTime - lastLapTime;
                     const coolDown = parseFloat(localStorage.getItem('lapCoolDownTime')) || 30000;
 
-                    // クールダウン時間を経過していればラップ確定
                     if (timeSinceLastLap >= coolDown) {
-                        processLap(intersectionTime, true); // GPS通過なのでuseFreeze=true
+                        processLap(intersectionTime, true);
                     }
                 }
             }
         }
-        lastPos = cur; // 今回の地点を保存
+        lastPos = cur; 
     }
 }
 // --- 3. ラップ管理・描画 ---
@@ -313,19 +316,54 @@ function drawTacho(rpm) {
 
 function exportGPX() {
     if (trackLogs.length === 0 && currentLapLog.length === 0) return;
-    const all = [...trackLogs, currentLapLog];
-    let gpx = `<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="KLAP_DEGI" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">`;
-    all.forEach((lap, i) => {
+    
+    // 走行中のデータ（最後の周）も忘れずに含める
+    const allLaps = [...trackLogs];
+    if (currentLapLog.length > 0) allLaps.push(currentLapLog);
+
+    let gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="KLAP_DEGI" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
+<metadata><name>Race Session ${new Date().toLocaleString()}</name></metadata>`;
+
+    allLaps.forEach((lap, i) => {
         if (lap.length === 0) return;
-        gpx += `\n<trk><name>Lap ${i+1}</name><trkseg>`;
+        
+        // 各ラップを独立したトラックとして出力
+        gpx += `\n<trk>
+  <name>Lap ${i + 1}</name>
+  <trkseg>`;
+        
         lap.forEach(p => { 
-            gpx += `\n  <trkpt lat="${p.lat}" lon="${p.lon}"><time>${new Date(p.time).toISOString()}</time><extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>${Math.round(p.rpm)}</gpxtpx:hr><gpxtpx:atemp>${p.temp}</gpxtpx:atemp></gpxtpx:TrackPointExtension><speed>${(p.speed / 3.6).toFixed(2)}</speed></extensions></trkpt>`; 
+            // 💡 数値がNaNにならないよう、デフォルト値(0)を設定
+            const lat = p.lat || 0;
+            const lon = p.lon || 0;
+            const time = new Date(p.time).toISOString();
+            const speed = ((p.speed || 0) / 3.6).toFixed(2); // km/h -> m/s
+            const rpm = Math.round(p.rpm || 0);
+            const temp = p.temp || 0;
+
+            gpx += `\n    <trkpt lat="${lat}" lon="${lon}">
+      <time>${time}</time>
+      <speed>${speed}</speed>
+      <extensions>
+        <gpxtpx:TrackPointExtension>
+          <gpxtpx:hr>${rpm}</gpxtpx:hr>
+          <gpxtpx:atemp>${temp}</gpxtpx:atemp>
+        </gpxtpx:TrackPointExtension>
+      </extensions>
+    </trkpt>`; 
         });
-        gpx += `\n</trkseg></trk>`;
+        
+        gpx += `\n  </trkseg>\n</trk>`;
     });
+
     gpx += `\n</gpx>`;
+
     const blob = new Blob([gpx], { type: 'application/gpx+xml' });
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `RaceLog_${Date.now()}.gpx`; a.click();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `RaceLog_${Date.now()}.gpx`;
+    a.click();
 }
 
 setInterval(() => {
