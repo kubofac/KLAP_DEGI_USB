@@ -188,39 +188,53 @@ async function ble() {
 
 function parseNMEA(line) {
     const p = line.split(',');
-    // GGA文（位置情報）かつ測位状態が有効(0以外)であることを確認
-    if (line.includes('GGA') && p[6] !== '0') {
+    
+    // --- 1. RMC文での速度取得とFIX判定 ---
+    if (line.includes('RMC') && p[2] === 'A') {
+        isGpsFixed = true; // 測位確定
+        lastUsbDataTime = Date.now(); // 通信時刻更新
+        
+        currentSpeedKmh = parseFloat(p[7]) * 1.852; // ノットをkm/hに変換
+        if (currentSpeedKmh > maxSpeed) {
+            maxSpeed = Math.round(currentSpeedKmh);
+            if (maxSpeed > sessionMaxSpeed) sessionMaxSpeed = maxSpeed;
+        }
+    }
+
+    // --- 2. GGA文での位置情報取得とFIX判定 ---
+    if (line.includes('GGA') && p[6] !== '0' && p[6] !== '') {
+        isGpsFixed = true; // 測位確定
+        lastUsbDataTime = Date.now(); // 通信時刻更新
+
         const cur = { 
             lat: dmmToDec(p[2], p[3]), 
             lon: dmmToDec(p[4], p[5]), 
             time: Date.now() 
         };
 
-        // TIMERがON（計測中）のとき
+        // TIMERがON（計測中）のときのみラップ判定を実行
         if (swState === 1) {
             currentLapLog.push(cur);
 
-            // 前回の位置(lastPos)があり、かつスタートライン(P1)が設定されている場合
+            // 前回の位置(lastPos)があり、かつスタートラインが設定されている場合
             if (lastPos && LAP_LINE_P1.lat !== 0) {
                 
-                // 💡 【修正の核心】
-                // 従来の「dist <= threshold」という点からの距離判定（円形の門番）を削除。
-                // 直接カプセル判定（線分交差）を実行します。
+                // カプセル判定（線分交差）を実行
                 const intersectionTime = getIntersectionTime(lastPos, cur);
 
-                // intersectionTimeがnullでない ＝ 「カプセルの範囲内でラインを跨いだ」
+                // ラインを跨いだ場合
                 if (intersectionTime !== null) {
                     const timeSinceLastLap = intersectionTime - lastLapTime;
                     const coolDown = parseFloat(localStorage.getItem('lapCoolDownTime')) || 30000;
 
-                    // クールダウン（例：30秒）さえ過ぎていれば、ラップ確定！
+                    // クールダウン時間を経過していればラップ確定
                     if (timeSinceLastLap >= coolDown) {
-                        processLap(intersectionTime, true);
+                        processLap(intersectionTime, true); // GPS通過なのでuseFreeze=true
                     }
                 }
             }
         }
-        lastPos = cur; // 今回の地点を次回の「前回の地点」として保存
+        lastPos = cur; // 今回の地点を保存
     }
 }
 // --- 3. ラップ管理・描画 ---
