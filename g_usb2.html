@@ -199,12 +199,12 @@ function parseNMEA(line) {
             maxSpeed = Math.round(currentSpeedKmh);
             if (maxSpeed > sessionMaxSpeed) sessionMaxSpeed = maxSpeed;
         }
-        // 【追加】画面のSPEED表示を更新
+        // 画面のSPEED表示を更新
         const speedEl = document.getElementById('speed_val');
         if(speedEl) speedEl.textContent = Math.round(currentSpeedKmh);
     }
 
-    // --- 2. GGA文：位置情報の取得と、その瞬間の車両データをパッキング ---
+    // --- 2. GGA文：位置情報の取得と、その瞬間の車両データを記録 ---
     if (line.includes('GGA') && p[6] !== '0' && p[6] !== '') {
         isGpsFixed = true; 
         lastUsbDataTime = Date.now(); 
@@ -213,14 +213,13 @@ function parseNMEA(line) {
             lat: dmmToDec(p[2], p[3]), 
             lon: dmmToDec(p[4], p[5]), 
             time: Date.now(),
-            // 💡【重要】解析アプリ用の紐付けデータ
-            // ここで保存しておかないと、GPX出力時に値が消えてNaNになります
+            // 💡 解析用に現在の状態をパッキング
             speed: currentSpeedKmh || 0,
             rpm: currentRPM || 0,
             temp: currentTemp || 0
         };
 
-        if (swState === 1) { // TIMERがONのとき
+        if (swState === 1) { // 計測中のみ
             currentLapLog.push(cur);
 
             if (lastPos && LAP_LINE_P1.lat !== 0) {
