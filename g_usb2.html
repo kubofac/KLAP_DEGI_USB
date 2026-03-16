@@ -105,41 +105,39 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 // 線分(p1-p2)とスタートライン(LAP_LINE_P1-P2)の交差および「向き」を計算
+// 線分(p1-p2)とスタートライン(LAP_LINE_P1-P2)の交差を【精密に】計算
 function getIntersectionTime(p1, p2) {
     if (!LAP_LINE_P1.lat || !LAP_LINE_P2.lat) return null;
+    
     const x1 = p1.lon, y1 = p1.lat, x2 = p2.lon, y2 = p2.lat;
     const x3 = LAP_LINE_P1.lon, y3 = LAP_LINE_P1.lat, x4 = LAP_LINE_P2.lon, y4 = LAP_LINE_P2.lat;
 
-    // 行列式による交差判定
     const den = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
-    if (Math.abs(den) < 1e-12) return null; // 完全並走/平行
+    if (Math.abs(den) < 1e-12) return null; // 完全並走または平行
 
-    const t = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / den; // 自車移動上の交点(0-1)
-    const u = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / den; // ライン上の交点(0-1)
+    const t = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / den; // 自車移動上の交点比率 (0-1)
+    const u = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / den; // ライン上の交点比率 (0-1)
 
-    // tが 0〜1 ならば、自車がライン（延長線含む）を跨いだ
+    // tが 0〜1 ならば、このGPS更新の間にラインを跨いでいる
     if (t >= 0 && t <= 1) {
         
-        // --- 方向判定 (外積: Cross Product) ---
-        const Lx = x4 - x3; // P1 -> P2 へのベクトル
-        const Ly = y4 - y3;
-        const Vx = x2 - x1; // 自車の移動ベクトル
-        const Vy = y2 - y1;
+        // --- 1. 方向判定 (外積) ---
+        const Lx = x4 - x3, Ly = y4 - y3, Vx = x2 - x1, Vy = y2 - y1;
         const crossProduct = (Lx * Vy) - (Ly * Vx);
         const currentMoveDir = crossProduct > 0 ? 1 : -1;
 
-        // 💡【あなたのアイデア】初回通過時に方向を記憶
+        // 初回通過時に方向を記憶
         if (detectedDirection === null) {
             detectedDirection = currentMoveDir;
             console.log("Start direction memorized: " + detectedDirection);
         }
 
-        // 💡【カプセル判定】記憶した方向と一致し、かつP1-P2の有効幅（遊び含む）を通過したか
-        // u = 0〜1 がP1-P2間。少し外れても良いように -0.2 〜 1.2 としています。
+        // --- 2. 複合条件判定 ---
+        // 「記憶した方向と同じ」かつ「ラインの幅(u=0~1)の中にいる（遊び0.2含む）」
         if (currentMoveDir === detectedDirection && u >= -0.2 && u <= 1.2) {
+            // --- 3. 精密な通過時刻の算出 ---
+            // 前後の点の時刻と比率tから、ラインを跨いだ「瞬間」のタイムスタンプを割り出す
             return p1.time + (p2.time - p1.time) * t; 
-        } else {
-            console.log("Crossing ignored: Wrong direction or out of capsule.");
         }
     }
     return null;
@@ -316,7 +314,6 @@ function drawTacho(rpm) {
 function exportGPX() {
     if (trackLogs.length === 0 && currentLapLog.length === 0) return;
     
-    // 完了したラップと、現在走行中のラップを結合
     const allLaps = [...trackLogs];
     if (currentLapLog.length > 0) allLaps.push(currentLapLog);
 
@@ -324,47 +321,38 @@ function exportGPX() {
 <gpx version="1.1" creator="KLAP_DEGI" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
 <metadata><name>Race Session ${new Date().toLocaleString()}</name></metadata>`;
 
+    // セッション全体の開始時刻を0秒の基準にする
+    const baseTimeForSession = allLaps[0][0].time;
+
     allLaps.forEach((lap, i) => {
         if (lap.length === 0) return;
-        
         gpx += `\n<trk><name>Lap ${i + 1}</name><trkseg>`;
         
-        // 💡 各ラップの最初の点の時刻を基準(0秒)とする
-        const lapBaseTime = lap[0].time;
-
         lap.forEach(p => { 
-            // 💡 2000年1月1日 00:00:00 を基準点とし、そこからの経過時間として出力
-            // これにより解析ソフト上の「177366...s」という異常表示を回避します
-            const relativeTime = new Date(946684800000 + (p.time - lapBaseTime)).toISOString();
+            // 2000年1月1日 00:00:00 UTC を基準(0秒)として経過時間を加算
+            const relativeTime = new Date(946684800000 + (p.time - baseTimeForSession)).toISOString();
             
-            const speed = ((p.speed || 0) / 3.6).toFixed(2); // m/sに変換
-            const rpm = Math.round(p.rpm || 0);
-            const temp = p.temp || 0;
-
             gpx += `\n    <trkpt lat="${p.lat}" lon="${p.lon}">
       <time>${relativeTime}</time>
-      <speed>${speed}</speed>
+      <speed>${((p.speed || 0) / 3.6).toFixed(2)}</speed>
       <extensions>
         <gpxtpx:TrackPointExtension>
-          <gpxtpx:hr>${rpm}</gpxtpx:hr>
-          <gpxtpx:atemp>${temp}</gpxtpx:atemp>
+          <gpxtpx:hr>${Math.round(p.rpm || 0)}</gpxtpx:hr>
+          <gpxtpx:atemp>${p.temp || 0}</gpxtpx:atemp>
         </gpxtpx:TrackPointExtension>
       </extensions>
     </trkpt>`; 
         });
-        
         gpx += `\n  </trkseg></trk>`;
     });
 
     gpx += `\n</gpx>`;
 
-    const blob = new Blob([gpx], { type: 'application/gpx+xml' });
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    a.href = URL.createObjectURL(new Blob([gpx], { type: 'application/gpx+xml' }));
     a.download = `RaceLog_${Date.now()}.gpx`;
     a.click();
 }
-
 setInterval(() => {
     const now = Date.now();
     document.getElementById('usbGpsBtn').className = (now - lastUsbDataTime < 1500 && isGpsFixed) ? 'active' : (usbWaiting ? 'waiting' : '');
