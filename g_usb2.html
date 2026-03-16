@@ -316,7 +316,7 @@ function drawTacho(rpm) {
 function exportGPX() {
     if (trackLogs.length === 0 && currentLapLog.length === 0) return;
     
-    // 走行中のデータ（最後の周）も忘れずに含める
+    // 完了したラップと、現在走行中のラップを結合
     const allLaps = [...trackLogs];
     if (currentLapLog.length > 0) allLaps.push(currentLapLog);
 
@@ -327,22 +327,22 @@ function exportGPX() {
     allLaps.forEach((lap, i) => {
         if (lap.length === 0) return;
         
-        // 各ラップを独立したトラックとして出力
-        gpx += `\n<trk>
-  <name>Lap ${i + 1}</name>
-  <trkseg>`;
+        gpx += `\n<trk><name>Lap ${i + 1}</name><trkseg>`;
         
+        // 💡 各ラップの最初の点の時刻を基準(0秒)とする
+        const lapBaseTime = lap[0].time;
+
         lap.forEach(p => { 
-            // 💡 数値がNaNにならないよう、デフォルト値(0)を設定
-            const lat = p.lat || 0;
-            const lon = p.lon || 0;
-            const time = new Date(p.time).toISOString();
-            const speed = ((p.speed || 0) / 3.6).toFixed(2); // km/h -> m/s
+            // 💡 2000年1月1日 00:00:00 を基準点とし、そこからの経過時間として出力
+            // これにより解析ソフト上の「177366...s」という異常表示を回避します
+            const relativeTime = new Date(946684800000 + (p.time - lapBaseTime)).toISOString();
+            
+            const speed = ((p.speed || 0) / 3.6).toFixed(2); // m/sに変換
             const rpm = Math.round(p.rpm || 0);
             const temp = p.temp || 0;
 
-            gpx += `\n    <trkpt lat="${lat}" lon="${lon}">
-      <time>${time}</time>
+            gpx += `\n    <trkpt lat="${p.lat}" lon="${p.lon}">
+      <time>${relativeTime}</time>
       <speed>${speed}</speed>
       <extensions>
         <gpxtpx:TrackPointExtension>
@@ -353,7 +353,7 @@ function exportGPX() {
     </trkpt>`; 
         });
         
-        gpx += `\n  </trkseg>\n</trk>`;
+        gpx += `\n  </trkseg></trk>`;
     });
 
     gpx += `\n</gpx>`;
