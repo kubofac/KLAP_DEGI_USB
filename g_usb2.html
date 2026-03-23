@@ -312,29 +312,48 @@ function drawTacho(rpm) {
 // --- 4. ログ出力・イベント ---
 
 function exportGPX() {
-    if (trackLogs.length === 0 && currentLapLog.length === 0) return;
+    if (trackLogs.length === 0 && currentLapLog.length === 0) {
+        alert("保存するログデータがありません。");
+        return;
+    }
     
-    const allLaps = [...trackLogs];
-    if (currentLapLog.length > 0) allLaps.push(currentLapLog);
+    // 全てのラップログを1つにまとめる
+    const allPoints = [];
+    trackLogs.forEach(lap => allPoints.push(...lap));
+    if (currentLapLog.length > 0) allPoints.push(...currentLapLog);
 
+    // スタートラインの座標を取得（メタデータ用）
+    const getL = () => {
+        const p1Lat = localStorage.getItem('startLineP1Lat');
+        if (!p1Lat) return "NOT_SET";
+        return `${p1Lat},${localStorage.getItem('startLineP1Lon')},${localStorage.getItem('startLineP2Lat')},${localStorage.getItem('startLineP2Lon')}`;
+    };
+    const lineData = `SL:${getL()}`;
+
+    // GPXヘッダー（Garmin拡張規格 gpxtpx を使用）
     let gpx = `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="KLAP_DEGI" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
-<metadata><name>Race Session ${new Date().toLocaleString()}</name></metadata>`;
+<metadata>
+    <name>Race Session ${new Date().toLocaleString()}</name>
+    <desc>LINE_DATA[${lineData}]</desc>
+</metadata>
+<trk>
+  <name>Race Log</name>
+  <trkseg>`;
 
-    // セッション全体の開始時刻を0秒の基準にする
-    const baseTimeForSession = allLaps[0][0].time;
+    // セッション全体の開始時刻を基準点（0秒）にする
+    const baseStartTime = allPoints[0].time;
 
-    allLaps.forEach((lap, i) => {
-        if (lap.length === 0) return;
-        gpx += `\n<trk><name>Lap ${i + 1}</name><trkseg>`;
+    // 各ポイントの書き出し
+    allPoints.forEach(p => { 
+        // 2000/1/1を基準とした相対時刻（解析ソフト互換）
+        const relativeTime = new Date(946684800000 + (p.time - baseStartTime)).toISOString();
+        const speedMS = ((p.speed || 0) / 3.6).toFixed(2); // km/h -> m/s 変換
         
-        lap.forEach(p => { 
-            // 2000年1月1日 00:00:00 UTC を基準(0秒)として経過時間を加算
-            const relativeTime = new Date(946684800000 + (p.time - baseTimeForSession)).toISOString();
-            
-            gpx += `\n    <trkpt lat="${p.lat}" lon="${p.lon}">
+        gpx += `
+    <trkpt lat="${p.lat}" lon="${p.lon}">
       <time>${relativeTime}</time>
-      <speed>${((p.speed || 0) / 3.6).toFixed(2)}</speed>
+      <speed>${speedMS}</speed>
       <extensions>
         <gpxtpx:TrackPointExtension>
           <gpxtpx:hr>${Math.round(p.rpm || 0)}</gpxtpx:hr>
@@ -342,16 +361,25 @@ function exportGPX() {
         </gpxtpx:TrackPointExtension>
       </extensions>
     </trkpt>`; 
-        });
-        gpx += `\n  </trkseg></trk>`;
     });
 
-    gpx += `\n</gpx>`;
+    gpx += `
+  </trkseg>
+</trk>
+</gpx>`;
 
+    // ファイル保存実行
+    const blob = new Blob([gpx], { type: 'application/gpx+xml' });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([gpx], { type: 'application/gpx+xml' }));
+    a.href = url;
     a.download = `RaceLog_${Date.now()}.gpx`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    alert("解析ソフト互換形式でGPXを保存しました。\n（SL座標・RPM・速度データを内包）");
 }
 setInterval(() => {
     const now = Date.now();
