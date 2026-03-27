@@ -207,23 +207,37 @@ function onDisconnected(event) {
     console.log('BLE Disconnected. Attempting to reconnect...');
     bleWaiting = true;
     
-    // 指数バックオフなどで再接続を試行
-    setTimeout(() => {
+    const attemptReconnect = () => {
         if (disconnectedDevice.gatt.connected) return;
-        
+
         disconnectedDevice.gatt.connect()
             .then(server => server.getPrimaryService(SERVICE_UUID))
             .then(service => service.getCharacteristic(PULSE_UUID))
-            .then(characteristic => characteristic.startNotifications())
-            .then(() => {
+            .then(characteristic => {
+                // 通知の再開
+                return characteristic.startNotifications().then(() => characteristic);
+            })
+            .then(characteristic => {
+                characteristic.oncharacteristicvaluechanged = (e) => {
+                    lastBleDataTime = Date.now(); // ここで時刻を更新し続ける
+                    const data = e.target.value;
+                    currentRPM = (data.getUint16(0, true) * 60) / (parseInt(localStorage.getItem('pl1')) || 1);
+                    currentTemp = data.getUint8(2);
+                    document.getElementById('temp_val').textContent = currentTemp;
+                };
+                
                 bleWaiting = false;
+                lastBleDataTime = Date.now(); // 接続成功時にも一度更新してボタンを「赤」にする
                 console.log('BLE Reconnected successfully');
             })
             .catch(error => {
-                console.error('Reconnect failed:', error);
-                // 失敗した場合は再度待ち受け状態へ（インジケーターはwaitingのまま）
+                console.error('Reconnect failed, retrying in 3s...', error);
+                // 失敗したら3秒後に再度実行（ループ構造にする）
+                setTimeout(attemptReconnect, 3000);
             });
-    }, 2000); // 2秒後に再試行
+    };
+
+    setTimeout(attemptReconnect, 2000);
 }
 
 function parseNMEA(line) {
