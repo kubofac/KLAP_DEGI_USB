@@ -166,12 +166,23 @@ async function startUsbGps() {
     } catch (e) { console.error(e); usbWaiting = false; }
 }
 
+// --- BLE再接続対応版 ble関数 ---
 async function ble() {
     try {
-        const bleDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
+        // デバイス選択
+        const bleDevice = await navigator.bluetooth.requestDevice({ 
+            filters: [{ services: [SERVICE_UUID] }] 
+        });
+        
         bleWaiting = true;
-        const server = await bleDevice.gatt.connect(), service = await server.getPrimaryService(SERVICE_UUID);
+        
+        // 切断イベントのリスナーを登録（ここが肝です）
+        bleDevice.addEventListener('gattserverdisconnected', onDisconnected);
+        
+        const server = await bleDevice.gatt.connect();
+        const service = await server.getPrimaryService(SERVICE_UUID);
         const pC = await service.getCharacteristic(PULSE_UUID);
+        
         await pC.startNotifications();
         pC.oncharacteristicvaluechanged = (e) => {
             lastBleDataTime = Date.now();
@@ -180,8 +191,39 @@ async function ble() {
             currentTemp = data.getUint8(2);
             document.getElementById('temp_val').textContent = currentTemp;
         };
+        
+        device = bleDevice; // デバイスオブジェクトを保持
         bleWaiting = false;
-    } catch (e) { console.error(e); bleWaiting = false; }
+        console.log("BLE Connected");
+    } catch (e) { 
+        console.error("BLE Connect Error:", e); 
+        bleWaiting = false; 
+    }
+}
+
+// --- 切断時に自動で再接続を試みる関数 ---
+function onDisconnected(event) {
+    const disconnectedDevice = event.target;
+    console.log('BLE Disconnected. Attempting to reconnect...');
+    bleWaiting = true;
+    
+    // 指数バックオフなどで再接続を試行
+    setTimeout(() => {
+        if (disconnectedDevice.gatt.connected) return;
+        
+        disconnectedDevice.gatt.connect()
+            .then(server => server.getPrimaryService(SERVICE_UUID))
+            .then(service => service.getCharacteristic(PULSE_UUID))
+            .then(characteristic => characteristic.startNotifications())
+            .then(() => {
+                bleWaiting = false;
+                console.log('BLE Reconnected successfully');
+            })
+            .catch(error => {
+                console.error('Reconnect failed:', error);
+                // 失敗した場合は再度待ち受け状態へ（インジケーターはwaitingのまま）
+            });
+    }, 2000); // 2秒後に再試行
 }
 
 function parseNMEA(line) {
