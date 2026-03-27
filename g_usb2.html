@@ -288,24 +288,63 @@ function tick() {
 
 function drawTacho(rpm) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const w = canvas.width, h = canvas.height, segments = 75, active = Math.floor((rpm / 14000) * segments);
+    const w = canvas.width, h = canvas.height, segments = 75;
+    
+    // 現在の回転数が全75セグメント中、どこまで到達しているか
+    const activeThreshold = (rpm / 14000) * segments; 
+
     const sX = 20, hY = 80, bY = h - 20, rad = bY - hY, curveEnd = 30;
-    for (let i = 0; i <= segments; i++) {
+
+    for (let i = 0; i < segments; i++) {
         let x, y, ang, prog;
         if (i <= curveEnd) {
-            prog = i / curveEnd; ang = Math.PI + (prog * (Math.PI / 2)); x = sX + rad + Math.cos(ang) * rad; y = hY + rad + Math.sin(ang) * rad;
+            prog = i / curveEnd; 
+            ang = Math.PI + (prog * (Math.PI / 2)); 
+            x = sX + rad + Math.cos(ang) * rad; 
+            y = hY + rad + Math.sin(ang) * rad;
         } else {
-            prog = (i - curveEnd) / (segments - curveEnd); x = (sX + rad) + (prog * (w - 15 - (sX + rad))); y = hY; ang = 1.5 * Math.PI;
+            prog = (i - curveEnd) / (segments - curveEnd); 
+            x = (sX + rad) + (prog * (w - 15 - (sX + rad))); 
+            y = hY; 
+            ang = 1.5 * Math.PI;
         }
-        if (i % 10 === 0 || i === segments) {
-            ctx.save(); ctx.fillStyle = i < active ? "#fff" : "#444"; ctx.font = "italic bold 22px Arial"; ctx.textAlign = "center";
-            ctx.fillText(Math.round((i / segments) * 14), x + Math.cos(ang) * 45, y + Math.sin(ang) * 45); ctx.restore();
+
+        // --- 色判定ロジック ---
+        let color = "#222"; // 未到達部分（暗いグレー）
+
+        if (i < activeThreshold) {
+            const currentSegmentRpm = (i / segments) * 14000;
+            
+            if (currentSegmentRpm >= 10500) {
+                color = "#E4002B"; // HRC Red (10500rpm〜)
+            } else if (currentSegmentRpm >= 6000) {
+                color = "#004098"; // HRC Blue (6000rpm〜10500rpm)
+            } else {
+                color = "#ffffff"; // White (〜6000rpm)
+            }
         }
-        if (i < segments) {
-            ctx.fillStyle = i < active ? (((i/segments)*14000) >= 12500 ? "#E4002B" : (((i/segments)*14000) >= 8000 ? "#004098" : "#FFFFFF")) : "#222";
-            ctx.save(); ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2); ctx.fillRect(-5, -23, 10, 46); ctx.restore();
+
+        // バー本体の描画
+        ctx.fillStyle = color;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(ang + Math.PI / 2);
+        ctx.fillRect(-5, -23, 10, 46);
+        ctx.restore();
+
+        // 目盛り数字の描画（10セグメント毎）
+        if (i % 10 === 0 || i === segments - 1) {
+            ctx.save();
+            ctx.fillStyle = (i < activeThreshold) ? "#fff" : "#444";
+            ctx.font = "italic bold 22px Arial";
+            ctx.textAlign = "center";
+            const labelX = x + Math.cos(ang) * 45;
+            const labelY = y + Math.sin(ang) * 45;
+            ctx.fillText(Math.round((i / segments) * 14), labelX, labelY);
+            ctx.restore();
         }
     }
+    // 数値表示の更新
     document.getElementById('rpm_val').textContent = Math.floor(rpm);
 }
 
