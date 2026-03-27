@@ -478,8 +478,27 @@ function exportGPX() {
 }
 setInterval(() => {
     const now = Date.now();
-    document.getElementById('usbGpsBtn').className = (now - lastUsbDataTime < 1500 && isGpsFixed) ? 'active' : (usbWaiting ? 'waiting' : '');
-    document.getElementById('btConnect').className = (now - lastBleDataTime < 1500) ? 'active' : (bleWaiting ? 'waiting' : '');
+
+    // 1. USB GPSの状態表示
+    const usbBtn = document.getElementById('usbGpsBtn');
+    usbBtn.className = (now - lastUsbDataTime < 1500 && isGpsFixed) ? 'active' : (usbWaiting ? 'waiting' : '');
+
+    // 2. BLEの状態表示（データが来れば赤、再接続待機中はオレンジ）
+    const btBtn = document.getElementById('btConnect');
+    btBtn.className = (now - lastBleDataTime < 1500) ? 'active' : (bleWaiting ? 'waiting' : '');
+
+    // 3. スタートライン設定のチェック (P1/P2いずれかが欠けている場合)
+    const p1Lat = localStorage.getItem('startLineP1Lat');
+    const p2Lat = localStorage.getItem('startLineP2Lat');
+    const reloadBtn = document.getElementById('reloadBtn');
+
+    if (!p1Lat || !p2Lat) {
+        reloadBtn.className = 'waiting'; // オレンジ色に
+        reloadBtn.textContent = 'SET LINE!';
+    } else {
+        reloadBtn.className = ''; // 通常（黒）
+        reloadBtn.textContent = 'RELOAD';
+    }
 }, 1000);
 
 document.getElementById('usbGpsBtn').onclick = startUsbGps;
