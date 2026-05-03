@@ -2,7 +2,7 @@
       "relation": ["delegate_permission/common.handle_all_urls"],
       "target": {
         "namespace": "android_app",
-        "package_name": "com.kfactoryclub.klap_usb_ver2.twa",
-        "sha256_cert_fingerprints": ["82:05:56:95:9B:19:F6:1E:0E:05:E8:85:48:BB:39:CF:3C:B7:0E:3D:E7:AB:E4:B6:AE:4D:F0:DD:F4:97:5B:4D"]
+        "package_name": "com.kfactoryclub.klap_degi_usb.twa",
+        "sha256_cert_fingerprints": ["7C:ED:EC:9C:26:04:E0:2D:C8:E2:EC:CE:61:B6:FA:E4:B8:E2:F3:8C:13:EC:F8:C0:55:EE:D5:49:DE:A2:6D:96"]
       }
     }]
